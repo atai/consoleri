@@ -27,7 +27,7 @@ describe('normalizeTerminalAppearance', () => {
 
 describe('normalizeChromeAppearance', () => {
   it('clamps sidebar width', () => {
-    expect(normalizeChromeAppearance({ sidebarWidth: 100 }).sidebarWidth).toBe(200)
+    expect(normalizeChromeAppearance({ sidebarWidth: 100 }).sidebarWidth).toBe(360)
     expect(normalizeChromeAppearance({ sidebarWidth: 900 }).sidebarWidth).toBe(480)
   })
 })

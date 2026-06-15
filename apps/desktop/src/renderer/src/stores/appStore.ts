@@ -1,19 +1,31 @@
 import { create } from 'zustand'
 import type { MosaicNode } from 'react-mosaic-component'
+import {
+  hostListViewToGroupFilter,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  type HostListGroupBy,
+  type HostListGroupFilter,
+  type HostListSortBy,
+  type HostListSortDir,
+  type HostListViewSettings
+} from '@consoleri/core'
 import type { Host, HostGroup, ConnectionProfile, SessionInfo, WorkspaceState, PaneBinding } from '@shared/types'
 
 const SETTINGS_KEY = 'consoleri.settings'
 const LAYOUT_SAVE_DEBOUNCE_MS = 300
+const HOST_LIST_VIEW_SAVE_DEBOUNCE_MS = 300
 let sidebarPersistTimer: ReturnType<typeof setTimeout> | null = null
-
 let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null
+let hostListViewSaveTimer: ReturnType<typeof setTimeout> | null = null
+let hostListViewReady = false
 
 interface AppSettings {
   autoOpenConnectionLog: boolean
 }
 
 function loadSidebarWidth(): number {
-  return 280
+  return 360
 }
 
 function loadSettings(): AppSettings {
@@ -33,20 +45,31 @@ export type SidebarView = 'hosts' | 'keys' | 'profiles' | 'appearance'
 
 interface AppState {
   hosts: Host[]
+  allHostTags: string[]
   groups: HostGroup[]
   profiles: ConnectionProfile[]
   sessions: SessionInfo[]
   workspace: WorkspaceState
+  hostListView: HostListViewSettings
+  hostListViewLoaded: boolean
   selectedHostId: string | null
   search: string
   selectedTags: string[]
-  selectedGroupId: string | null
+  selectedGroupId: HostListGroupFilter
+  groupBy: HostListGroupBy
+  collapsedSections: string[]
+  sortBy: HostListSortBy
+  sortDir: HostListSortDir
   sidebarWidth: number
   sidebarView: SidebarView
   settings: AppSettings
   setSearch: (s: string) => void
   setSelectedTags: (tags: string[]) => void
-  setSelectedGroupId: (id: string | null) => void
+  setSelectedGroupId: (id: HostListGroupFilter) => void
+  setGroupBy: (groupBy: HostListGroupBy) => void
+  setSortBy: (sortBy: HostListSortBy) => void
+  setSortDir: (sortDir: HostListSortDir) => void
+  toggleCollapsedSection: (sectionId: string) => void
   setSelectedHostId: (id: string | null) => void
   setSidebarView: (view: SidebarView) => void
   setHosts: (hosts: Host[]) => void
@@ -60,27 +83,113 @@ interface AppState {
   setSidebarWidth: (width: number) => void
   setSidebarWidthFromProfile: (width: number) => void
   setAutoOpenConnectionLog: (value: boolean) => void
+  loadHostListView: () => Promise<void>
   refreshHosts: () => Promise<void>
+  refreshAllHostTags: () => Promise<void>
   refreshGroups: () => Promise<void>
+}
+
+function syncHostListViewFields(view: HostListViewSettings): Pick<
+  AppState,
+  | 'hostListView'
+  | 'selectedTags'
+  | 'selectedGroupId'
+  | 'selectedHostId'
+  | 'groupBy'
+  | 'collapsedSections'
+  | 'sortBy'
+  | 'sortDir'
+> {
+  return {
+    hostListView: view,
+    selectedTags: view.selectedTags,
+    selectedGroupId: view.selectedGroupId,
+    selectedHostId: view.selectedHostId,
+    groupBy: view.groupBy,
+    collapsedSections: view.collapsedSections,
+    sortBy: view.sortBy,
+    sortDir: view.sortDir
+  }
+}
+
+function scheduleHostListViewPersist(get: () => AppState): void {
+  if (!hostListViewReady) return
+  if (hostListViewSaveTimer) clearTimeout(hostListViewSaveTimer)
+  hostListViewSaveTimer = setTimeout(() => {
+    hostListViewSaveTimer = null
+    const { hostListView } = get()
+    void window.consoleri.preferences.setHostListView(hostListView)
+  }, HOST_LIST_VIEW_SAVE_DEBOUNCE_MS)
+}
+
+function updateHostListView(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  patch: Partial<HostListViewSettings>
+): void {
+  const nextView: HostListViewSettings = {
+    ...get().hostListView,
+    ...patch
+  }
+  set(syncHostListViewFields(nextView))
+  scheduleHostListViewPersist(get)
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
+  allHostTags: [],
   groups: [],
   profiles: [],
   sessions: [],
   workspace: { layout: null, panes: [] },
+  hostListView: {
+    version: 1,
+    groupBy: 'none',
+    selectedTags: [],
+    selectedGroupId: 'all',
+    selectedHostId: null,
+    collapsedSections: [],
+    sortBy: 'name',
+    sortDir: 'asc'
+  },
+  hostListViewLoaded: false,
   selectedHostId: null,
   search: '',
   selectedTags: [],
-  selectedGroupId: null,
+  selectedGroupId: 'all',
+  groupBy: 'none',
+  collapsedSections: [],
+  sortBy: 'name',
+  sortDir: 'asc',
   sidebarWidth: loadSidebarWidth(),
   sidebarView: 'hosts',
   settings: loadSettings(),
   setSearch: (search) => set({ search }),
-  setSelectedTags: (selectedTags) => set({ selectedTags }),
-  setSelectedGroupId: (selectedGroupId) => set({ selectedGroupId }),
-  setSelectedHostId: (selectedHostId) => set({ selectedHostId }),
+  setSelectedTags: (selectedTags) => {
+    updateHostListView(get, set, { selectedTags })
+  },
+  setSelectedGroupId: (selectedGroupId) => {
+    updateHostListView(get, set, { selectedGroupId })
+  },
+  setGroupBy: (groupBy) => {
+    updateHostListView(get, set, { groupBy })
+  },
+  setSortBy: (sortBy) => {
+    updateHostListView(get, set, { sortBy })
+  },
+  setSortDir: (sortDir) => {
+    updateHostListView(get, set, { sortDir })
+  },
+  toggleCollapsedSection: (sectionId) => {
+    const collapsed = get().collapsedSections
+    const next = collapsed.includes(sectionId)
+      ? collapsed.filter((id) => id !== sectionId)
+      : [...collapsed, sectionId]
+    updateHostListView(get, set, { collapsedSections: next })
+  },
+  setSelectedHostId: (selectedHostId) => {
+    updateHostListView(get, set, { selectedHostId })
+  },
   setSidebarView: (sidebarView) => set({ sidebarView }),
   setHosts: (hosts) => set({ hosts }),
   setGroups: (groups) => set({ groups }),
@@ -110,7 +219,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     void window.consoleri.workspace.save(state)
   },
   setSidebarWidth: (width) => {
-    const clamped = Math.min(480, Math.max(200, width))
+    const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
     set({ sidebarWidth: clamped })
     if (sidebarPersistTimer) clearTimeout(sidebarPersistTimer)
     sidebarPersistTimer = setTimeout(() => {
@@ -123,7 +232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }, 300)
   },
   setSidebarWidthFromProfile: (width) => {
-    const clamped = Math.min(480, Math.max(200, width))
+    const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
     set({ sidebarWidth: clamped })
   },
   setAutoOpenConnectionLog: (autoOpenConnectionLog) => {
@@ -131,14 +240,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
     set({ settings })
   },
+  loadHostListView: async () => {
+    const view = await window.consoleri.preferences.getHostListView()
+    hostListViewReady = true
+    set({
+      ...syncHostListViewFields(view),
+      hostListViewLoaded: true
+    })
+  },
   refreshHosts: async () => {
     const { search, selectedTags, selectedGroupId } = get()
+    const groupId = hostListViewToGroupFilter(selectedGroupId)
     const hosts = await window.consoleri.hosts.list({
       search: search || undefined,
       tags: selectedTags.length ? selectedTags : undefined,
-      groupId: selectedGroupId
+      ...(groupId !== undefined ? { groupId } : {})
     })
+
+    let { selectedHostId } = get()
+    if (selectedHostId && !hosts.some((host) => host.id === selectedHostId)) {
+      selectedHostId = null
+      updateHostListView(get, set, { selectedHostId: null })
+    }
+
     set({ hosts })
+  },
+  refreshAllHostTags: async () => {
+    const allHosts = await window.consoleri.hosts.list()
+    const tagSet = new Set<string>()
+    allHosts.forEach((host) => host.tags.forEach((tag) => tagSet.add(tag)))
+    set({ allHostTags: Array.from(tagSet).sort() })
   },
   refreshGroups: async () => {
     const groups = await window.consoleri.groups.list()

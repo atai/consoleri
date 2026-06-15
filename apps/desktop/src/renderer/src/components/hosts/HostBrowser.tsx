@@ -1,26 +1,59 @@
 import { useEffect, useMemo, useState } from 'react'
+import { buildHostListSections, type HostListGroupBy, type HostListSortBy } from '@consoleri/core'
 import type { ConnectionProfile, Host } from '@shared/types'
 import { useAppStore } from '../../stores/appStore'
+import { HostActionsMenu } from './HostActionsMenu'
 import { HostForm } from './HostForm'
 import { HostDetailPanel } from './HostDetailPanel'
-import { HostListItem } from './HostListItem'
+import { HostListSection } from './HostListSection'
 import { openSessionAndAddToWorkspace } from '../../session/openSession'
+
+const GROUP_BY_OPTIONS: Array<{ value: HostListGroupBy; label: string }> = [
+  { value: 'none', label: 'None' },
+  { value: 'tag', label: 'Tag' },
+  { value: 'osType', label: 'OS' }
+]
+
+const HOST_SORT_OPTIONS: Array<{ value: HostListSortBy; label: string }> = [
+  { value: 'name', label: 'Name' },
+  { value: 'hostname', label: 'Host' }
+]
+
+function toolbarButtonClass(active: boolean): string {
+  return `shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
+    active
+      ? 'bg-blue-600 text-white'
+      : 'bg-[#21262d] text-gray-400 hover:text-gray-200'
+  }`
+}
 
 export function HostBrowser(): React.JSX.Element {
   const {
     hosts,
+    allHostTags,
     groups,
     search,
     selectedTags,
     selectedGroupId,
     selectedHostId,
+    groupBy,
+    collapsedSections,
+    sortBy,
+    sortDir,
+    hostListViewLoaded,
     settings,
     setSearch,
     setSelectedTags,
     setSelectedGroupId,
+    setGroupBy,
+    setSortBy,
+    setSortDir,
+    toggleCollapsedSection,
     setSelectedHostId,
     setAutoOpenConnectionLog,
+    loadHostListView,
     refreshHosts,
+    refreshAllHostTags,
     refreshGroups
   } = useAppStore()
 
@@ -29,13 +62,28 @@ export function HostBrowser(): React.JSX.Element {
   const [profiles, setProfiles] = useState<ConnectionProfile[]>([])
   const [importJson, setImportJson] = useState('')
   const [showImport, setShowImport] = useState(false)
+  const [showTagFilters, setShowTagFilters] = useState(false)
   const [wslDistros, setWslDistros] = useState<{ name: string }[]>([])
 
   useEffect(() => {
+    void loadHostListView()
+  }, [loadHostListView])
+
+  useEffect(() => {
+    if (!hostListViewLoaded) return
     refreshHosts()
     refreshGroups()
+    refreshAllHostTags()
     window.consoleri.wsl.list().then(setWslDistros)
-  }, [refreshHosts, refreshGroups, search, selectedTags, selectedGroupId])
+  }, [
+    hostListViewLoaded,
+    refreshHosts,
+    refreshGroups,
+    refreshAllHostTags,
+    search,
+    selectedTags,
+    selectedGroupId
+  ])
 
   useEffect(() => {
     if (selectedHostId) {
@@ -45,11 +93,16 @@ export function HostBrowser(): React.JSX.Element {
     }
   }, [selectedHostId])
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>()
-    hosts.forEach((h) => h.tags.forEach((t) => tagSet.add(t)))
-    return Array.from(tagSet).sort()
-  }, [hosts])
+  useEffect(() => {
+    if (selectedTags.length > 0) {
+      setShowTagFilters(true)
+    }
+  }, [selectedTags.length])
+
+  const hostSections = useMemo(
+    () => buildHostListSections(hosts, groupBy, sortBy, sortDir),
+    [hosts, groupBy, sortBy, sortDir]
+  )
 
   const refreshProfiles = (): void => {
     if (selectedHostId) {
@@ -94,6 +147,7 @@ export function HostBrowser(): React.JSX.Element {
       setImportJson('')
       setShowImport(false)
       refreshHosts()
+      refreshAllHostTags()
     } catch {
       alert('Invalid JSON')
     }
@@ -108,6 +162,7 @@ export function HostBrowser(): React.JSX.Element {
       setEditingHostId(null)
     }
     refreshHosts()
+    refreshAllHostTags()
   }
 
   const startEditHost = (hostId: string): void => {
@@ -119,64 +174,129 @@ export function HostBrowser(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#161b22]">
-      <div className="shrink-0 border-b border-[#30363d] p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-100">Consoleri</h1>
-        </div>
+      <div className="shrink-0 border-b border-[#30363d] px-2 py-1.5">
         <input
           type="search"
           placeholder="Search hosts…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-sm text-gray-100 placeholder:text-gray-600"
+          className="w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1 text-xs text-gray-100 placeholder:text-gray-600"
         />
       </div>
 
-      <div className="shrink-0 flex flex-wrap gap-1 border-b border-[#30363d] p-2">
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-500"
-        >
-          + Host
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowImport(!showImport)}
-          className="rounded border border-[#30363d] px-2 py-1 text-xs text-gray-300 hover:bg-[#21262d]"
-        >
-          Import
-        </button>
-        <button
-          type="button"
-          onClick={() => openLocalShell('powershell')}
-          className="rounded border border-[#30363d] px-2 py-1 text-xs text-gray-300 hover:bg-[#21262d]"
-        >
-          PS
-        </button>
-        <button
-          type="button"
-          onClick={() => openLocalShell('bash')}
-          className="rounded border border-[#30363d] px-2 py-1 text-xs text-gray-300 hover:bg-[#21262d]"
-        >
-          Bash
-        </button>
-        {wslDistros.length > 0 && (
-          <select
-            className="rounded border border-[#30363d] bg-[#0d1117] px-1 py-1 text-xs text-gray-300"
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) openLocalShell('wsl', e.target.value)
-              e.target.value = ''
-            }}
-          >
-            <option value="">WSL…</option>
-            {wslDistros.map((d) => (
-              <option key={d.name} value={d.name}>
-                {d.name}
-              </option>
+      <div className="shrink-0 border-b border-[#30363d]">
+        <div className="flex items-center gap-2 px-2 py-1">
+          <HostActionsMenu
+            onAddHost={() => setShowForm(true)}
+            onImport={() => setShowImport(true)}
+            onOpenPowerShell={() => openLocalShell('powershell')}
+            onOpenBash={() => openLocalShell('bash')}
+            wslDistros={wslDistros}
+            onOpenWsl={(distro) => openLocalShell('wsl', distro)}
+          />
+
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+            {GROUP_BY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setGroupBy(option.value)}
+                className={toolbarButtonClass(groupBy === option.value)}
+              >
+                {option.label}
+              </button>
             ))}
-          </select>
+
+            {groupBy === 'none' &&
+              HOST_SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSortBy(option.value)}
+                  className={toolbarButtonClass(sortBy === option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            <button
+              type="button"
+              onClick={() => setSortDir('asc')}
+              className={toolbarButtonClass(sortDir === 'asc')}
+              title="Ascending"
+            >
+              A→Z
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortDir('desc')}
+              className={toolbarButtonClass(sortDir === 'desc')}
+              title="Descending"
+            >
+              Z→A
+            </button>
+
+            {allHostTags.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowTagFilters((open) => !open)}
+                className={toolbarButtonClass(showTagFilters || selectedTags.length > 0)}
+              >
+                Tags
+                {selectedTags.length > 0 && (
+                  <span className="ml-1 rounded-full bg-blue-500/30 px-1 text-[10px]">
+                    {selectedTags.length}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {groups.length > 0 && (
+              <select
+                className="max-w-[6.5rem] shrink-0 rounded border border-[#30363d] bg-[#0d1117] px-1 py-0.5 text-[11px] text-gray-300"
+                value={selectedGroupId === null ? '__ungrouped__' : selectedGroupId}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === 'all') setSelectedGroupId('all')
+                  else if (value === '__ungrouped__') setSelectedGroupId(null)
+                  else setSelectedGroupId(value)
+                }}
+                title="Filter by host group"
+              >
+                <option value="all">All groups</option>
+                <option value="__ungrouped__">Ungrouped</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        {showTagFilters && allHostTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 border-t border-[#30363d]/60 px-2 py-1">
+            {allHostTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() =>
+                  setSelectedTags(
+                    selectedTags.includes(tag)
+                      ? selectedTags.filter((t) => t !== tag)
+                      : [...selectedTags, tag]
+                  )
+                }
+                className={`rounded px-1.5 py-0.5 text-[11px] ${
+                  selectedTags.includes(tag)
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-[#21262d] text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
@@ -206,70 +326,32 @@ export function HostBrowser(): React.JSX.Element {
               onSave={() => {
                 setShowForm(false)
                 refreshHosts()
+                refreshAllHostTags()
               }}
               onCancel={() => setShowForm(false)}
             />
           </div>
         )}
 
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-1 border-b border-[#30363d] p-2">
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() =>
-                  setSelectedTags(
-                    selectedTags.includes(tag)
-                      ? selectedTags.filter((t) => t !== tag)
-                      : [...selectedTags, tag]
-                  )
-                }
-                className={`rounded px-1.5 py-0.5 text-xs ${
-                  selectedTags.includes(tag)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-[#21262d] text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {groups.length > 0 && (
-          <div className="border-b border-[#30363d] p-2">
-            <select
-              className="w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1 text-xs text-gray-300"
-              value={selectedGroupId ?? ''}
-              onChange={(e) => setSelectedGroupId(e.target.value || null)}
-            >
-              <option value="">All groups</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <ul>
-          {hosts.map((host) => (
-            <HostListItem
-              key={host.id}
-              host={host}
-              selected={selectedHostId === host.id}
-              onSelect={() => setSelectedHostId(host.id)}
-              onConnect={() => connectHost(host)}
-              onEdit={() => startEditHost(host.id)}
-              onDelete={() => handleDeleteHost(host.id)}
+        {hosts.length === 0 ? (
+          <p className="p-4 text-center text-sm text-gray-500">No hosts yet</p>
+        ) : (
+          hostSections.map((section) => (
+            <HostListSection
+              key={section.id}
+              id={section.id}
+              label={section.label}
+              hosts={section.hosts}
+              collapsed={collapsedSections.includes(section.id)}
+              selectedHostId={selectedHostId}
+              onToggleCollapsed={() => toggleCollapsedSection(section.id)}
+              onSelect={setSelectedHostId}
+              onConnect={connectHost}
+              onEdit={startEditHost}
+              onDelete={handleDeleteHost}
             />
-          ))}
-          {hosts.length === 0 && (
-            <li className="p-4 text-center text-sm text-gray-500">No hosts yet</li>
-          )}
-        </ul>
+          ))
+        )}
       </div>
 
       {selectedHost && (
@@ -285,11 +367,13 @@ export function HostBrowser(): React.JSX.Element {
           onCancelEdit={() => setEditingHostId(null)}
           onHostUpdated={() => {
             refreshHosts()
+            refreshAllHostTags()
             refreshProfiles()
           }}
           onProfilesChanged={() => {
             refreshProfiles()
             refreshHosts()
+            refreshAllHostTags()
           }}
         />
       )}

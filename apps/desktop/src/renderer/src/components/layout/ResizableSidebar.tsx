@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from '@consoleri/core'
 import { useAppStore } from '../../stores/appStore'
-
-const MIN_WIDTH = 200
-const MAX_WIDTH = 480
 
 interface ResizableSidebarProps {
   children: ReactNode
@@ -41,7 +39,7 @@ export function ResizableSidebar({ children }: ResizableSidebarProps): React.JSX
     }
   }, [setSidebarWidth])
 
-  const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, sidebarWidth))
+  const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth))
 
   return (
     <div className="relative flex h-full shrink-0" style={{ width: clamped }}>

@@ -1,7 +1,7 @@
 import { ipcMain, clipboard, type BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
 import { IPC_CHANNELS } from '../../shared/types'
-import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState } from '../../shared/types'
+import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState, DeployKeyRequest } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
 import { credentialVault } from '../hosts/CredentialVault'
@@ -11,7 +11,8 @@ import { openLogWindow } from '../windows/LogWindow'
 import { sshKeyService } from '../keys/SshKeyService'
 import { sshKeyDeployer } from '../keys/SshKeyDeployer'
 import { migrateSidebarWidthFromRenderer } from '../db/database'
-import type { DeployKeyRequest } from '../../shared/types'
+import { appPreferencesRepository } from '../preferences/AppPreferencesRepository'
+import type { HostListViewSettings } from '@consoleri/core'
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC_CHANNELS.hostsList, (_e, filter: HostFilter) => {
@@ -237,6 +238,17 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   })
 
   ipcMain.handle(IPC_CHANNELS.clipboardReadText, () => clipboard.readText())
+
+  ipcMain.handle(IPC_CHANNELS.preferencesGetHostListView, () => {
+    return appPreferencesRepository.getHostListView()
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.preferencesSetHostListView,
+    (_e, patch: Partial<HostListViewSettings>) => {
+      return appPreferencesRepository.setHostListView(patch)
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.clipboardWriteText, (_e, text: string) => {
     clipboard.writeText(text)

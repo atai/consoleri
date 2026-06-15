@@ -4,6 +4,9 @@ import { EditDeleteActions } from '../ui/EditDeleteActions'
 import { HostForm } from './HostForm'
 import { HostProfilesSection } from '../profiles/HostProfilesSection'
 
+const PANEL_CLASS =
+  'shrink-0 border-t-2 border-blue-500/40 bg-[#0d1117] p-3 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]'
+
 interface HostDetailPanelProps {
   host: Host
   profiles: ConnectionProfile[]
@@ -33,7 +36,10 @@ export function HostDetailPanel({
 }: HostDetailPanelProps): React.JSX.Element {
   if (editing) {
     return (
-      <div className="shrink-0 border-t border-[#30363d]">
+      <div className={PANEL_CLASS}>
+        <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-blue-400/80">
+          Edit host
+        </div>
         <HostForm
           host={host}
           onSave={() => {
@@ -47,7 +53,10 @@ export function HostDetailPanel({
   }
 
   return (
-    <div className="shrink-0 border-t border-[#30363d] p-3">
+    <div className={PANEL_CLASS}>
+      <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-blue-400/80">
+        Connect
+      </div>
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-gray-200">{host.name}</div>

@@ -6,7 +6,9 @@ import { nanoid } from 'nanoid'
 import {
   BUILTIN_UX_PROFILE_ID,
   createBuiltinUxProfile,
-  DEFAULT_CHROME_APPEARANCE
+  DEFAULT_CHROME_APPEARANCE,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH
 } from '@consoleri/core'
 
 let db: DatabaseSync | null = null
@@ -202,7 +204,7 @@ function migrateUxProfiles(database: DatabaseSync): void {
 }
 
 export function migrateSidebarWidthFromRenderer(width: number): void {
-  const clamped = Math.min(480, Math.max(200, width))
+  const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
   if (clamped === DEFAULT_CHROME_APPEARANCE.sidebarWidth) return
   const db = getDatabase()
   const row = db.prepare('SELECT settings_json FROM ux_profiles WHERE id = ?').get(BUILTIN_UX_PROFILE_ID) as

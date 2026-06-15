@@ -1,4 +1,9 @@
-import { DEFAULT_CHROME_APPEARANCE, DEFAULT_TERMINAL_APPEARANCE } from './defaults'
+import {
+  DEFAULT_CHROME_APPEARANCE,
+  DEFAULT_TERMINAL_APPEARANCE,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH
+} from './defaults'
 import type {
   ChromeAppearance,
   TerminalAppearance,
@@ -61,8 +66,8 @@ export function normalizeChromeAppearance(
   return {
     sidebarWidth: clamp(
       typeof input?.sidebarWidth === 'number' ? input.sidebarWidth : base.sidebarWidth,
-      200,
-      480
+      MIN_SIDEBAR_WIDTH,
+      MAX_SIDEBAR_WIDTH
     )
   }
 }

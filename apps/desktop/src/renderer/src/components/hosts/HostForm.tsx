@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { ConnectionProfile, Host, HostInput, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
 import { HOST_LOG_VERBOSITY_OPTIONS } from '@consoleri/core'
+import { useAppStore } from '../../stores/appStore'
 import { ProfileForm } from '../profiles/ProfileForm'
 import { PickProfileDialog } from '../profiles/PickProfileDialog'
+import { TagInput } from './TagInput'
 import {
   applyPendingProfiles,
   pendingProfileLabel,
@@ -22,6 +24,7 @@ function newPendingKey(): string {
 }
 
 export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.Element {
+  const { allHostTags, refreshAllHostTags } = useAppStore()
   const [name, setName] = useState(host?.name ?? '')
   const [hostname, setHostname] = useState(host?.hostname ?? '')
   const [port, setPort] = useState(host?.port ?? 22)
@@ -38,7 +41,8 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
 
   useEffect(() => {
     void window.consoleri.uxProfiles.list().then(setUxProfiles)
-  }, [])
+    void refreshAllHostTags()
+  }, [refreshAllHostTags])
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -228,10 +232,11 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
 
         <label className="block">
           <span className="text-gray-400">Tags (comma-separated)</span>
-          <input
-            className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
+          <TagInput
+            id="host-tags"
             value={tags}
-            onChange={(e) => setTags(e.target.value)}
+            onChange={setTags}
+            existingTags={allHostTags}
             placeholder="prod, db, eu-west"
           />
         </label>

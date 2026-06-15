@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import {
   DEFAULT_CHROME_APPEARANCE,
   DEFAULT_TERMINAL_APPEARANCE,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
   TERMINAL_THEME_KEYS,
   normalizeUxProfileInput
 } from '@consoleri/core'
@@ -141,8 +143,8 @@ export function UxProfileForm({ profile, onSave, onCancel }: UxProfileFormProps)
         <span className="text-gray-400">Sidebar width</span>
         <input
           type="number"
-          min={200}
-          max={480}
+          min={MIN_SIDEBAR_WIDTH}
+          max={MAX_SIDEBAR_WIDTH}
           className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
           value={sidebarWidth}
           onChange={(e) => setSidebarWidth(Number(e.target.value))}

@@ -18,7 +18,8 @@ import type {
   SshKeyInfo,
   WslDistro,
   UxProfile,
-  UxProfileInput
+  UxProfileInput,
+  HostListViewSettings
 } from '../shared/types'
 
 export interface ConsoleriAPI {
@@ -114,6 +115,10 @@ export interface ConsoleriAPI {
   clipboard: {
     readText: () => Promise<string>
     writeText: (text: string) => Promise<void>
+  }
+  preferences: {
+    getHostListView: () => Promise<HostListViewSettings>
+    setHostListView: (patch: Partial<HostListViewSettings>) => Promise<HostListViewSettings>
   }
 }
 
@@ -223,6 +228,10 @@ const consoleri: ConsoleriAPI = {
   clipboard: {
     readText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardReadText),
     writeText: (text) => ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text)
+  },
+  preferences: {
+    getHostListView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetHostListView),
+    setHostListView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetHostListView, patch)
   }
 }
 

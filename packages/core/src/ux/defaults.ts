@@ -32,8 +32,11 @@ export const DEFAULT_TERMINAL_APPEARANCE: TerminalAppearance = {
   theme: DEFAULT_TERMINAL_THEME
 }
 
+export const MIN_SIDEBAR_WIDTH = 360
+export const MAX_SIDEBAR_WIDTH = 480
+
 export const DEFAULT_CHROME_APPEARANCE: ChromeAppearance = {
-  sidebarWidth: 280
+  sidebarWidth: 360
 }
 
 export function createBuiltinUxProfile(now = new Date().toISOString()): UxProfile {
