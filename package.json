@@ -1,0 +1,24 @@
+{
+  "name": "consoleri",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Consoleri — remote host console manager",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @consoleri/desktop",
+    "build": "npm run build -w @consoleri/desktop",
+    "package": "npm run build:win -w @consoleri/desktop",
+    "lint": "npm run lint -w @consoleri/desktop",
+    "typecheck": "npm run typecheck -w @consoleri/desktop",
+    "test": "npm run test -w @consoleri/core",
+    "rebuild-native": "node scripts/rebuild-native.mjs",
+    "install:electron": "node node_modules/electron/install.js",
+    "postinstall": "node scripts/postinstall.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.consoleri-mosaic {
+  background: #0f1117;
+}
+
+.consoleri-mosaic .mosaic-root {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.consoleri-mosaic .mosaic-window-toolbar {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+
+.consoleri-mosaic .mosaic-window-title {
+  color: #c9d1d9;
+  font-size: 12px;
+}
+
+.consoleri-mosaic .mosaic-split:hover .mosaic-split-line {
+  background: #58a6ff;
+}
+
+.consoleri-mosaic .mosaic-tile {
+  margin: 2px;
+}
+
+.consoleri-mosaic .mosaic-window-body {
+  background: #0d1117;
+}
