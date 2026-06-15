@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { ConnectionProfile, Host, HostInput, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
-import { HOST_LOG_VERBOSITY_OPTIONS } from '@consoleri/core'
+import { HOST_LOG_VERBOSITY_OPTIONS, parseTagsInput } from '@consoleri/core'
 import { useAppStore } from '../../stores/appStore'
 import { ProfileForm } from '../profiles/ProfileForm'
 import { PickProfileDialog } from '../profiles/PickProfileDialog'
 import { TagInput } from './TagInput'
+import { HostProfilesSection } from '../profiles/HostProfilesSection'
 import {
   applyPendingProfiles,
   pendingProfileLabel,
@@ -13,6 +14,9 @@ import {
 
 interface HostFormProps {
   host?: Host
+  profiles?: ConnectionProfile[]
+  onProfilesChanged?: () => void
+  onConnect?: (host: Host, profileId?: string) => void
   onSave: () => void
   onCancel: () => void
 }
@@ -23,8 +27,15 @@ function newPendingKey(): string {
   return crypto.randomUUID().replace(/-/g, '').slice(0, 12)
 }
 
-export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.Element {
-  const { allHostTags, refreshAllHostTags } = useAppStore()
+export function HostForm({
+  host,
+  profiles,
+  onProfilesChanged,
+  onConnect,
+  onSave,
+  onCancel
+}: HostFormProps): React.JSX.Element {
+  const { allHostTags, allHosts, refreshAllHostTags, refreshAllHosts } = useAppStore()
   const [name, setName] = useState(host?.name ?? '')
   const [hostname, setHostname] = useState(host?.hostname ?? '')
   const [port, setPort] = useState(host?.port ?? 22)
@@ -38,11 +49,17 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([])
   const [showAddProfile, setShowAddProfile] = useState(false)
   const [showPickDialog, setShowPickDialog] = useState(false)
+  const [relatedHostIds, setRelatedHostIds] = useState<string[]>(host?.relatedHostIds ?? [])
+  const [gatewayHostId, setGatewayHostId] = useState(host?.gatewayHostId ?? '')
+
+  const otherHosts = allHosts.filter((h) => h.id !== host?.id)
+  const gatewayOptions = otherHosts.filter((h) => h.gatewayHostId !== host?.id)
 
   useEffect(() => {
     void window.consoleri.uxProfiles.list().then(setUxProfiles)
     void refreshAllHostTags()
-  }, [refreshAllHostTags])
+    void refreshAllHosts()
+  }, [refreshAllHostTags, refreshAllHosts])
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -53,13 +70,12 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
         hostname,
         port,
         osType,
-        tags: tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
+        tags: parseTagsInput(tags),
         notes,
         logVerbosity,
-        uxProfileId: uxProfileId || null
+        uxProfileId: uxProfileId || null,
+        relatedHostIds,
+        gatewayHostId: gatewayHostId || null
       }
 
       if (host) {
@@ -91,7 +107,7 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-3 p-4 text-sm">
-        <h3 className="text-base font-medium text-gray-200">{host ? 'Edit host' : 'Add host'}</h3>
+        {!host && <h3 className="text-base font-medium text-gray-200">Add host</h3>}
         <label className="block">
           <span className="text-gray-400">Name</span>
           <input
@@ -240,6 +256,47 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
             placeholder="prod, db, eu-west"
           />
         </label>
+
+        {host && otherHosts.length > 0 && (
+          <div className="block">
+            <span className="text-gray-400">Related hosts</span>
+            <div className="mt-1 max-h-28 overflow-y-auto rounded border border-[#30363d] bg-[#0d1117] p-2">
+              {otherHosts.map((h) => (
+                <label key={h.id} className="flex cursor-pointer items-center gap-2 py-0.5 text-xs text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={relatedHostIds.includes(h.id)}
+                    onChange={(e) => {
+                      setRelatedHostIds((prev) =>
+                        e.target.checked ? [...prev, h.id] : prev.filter((id) => id !== h.id)
+                      )
+                    }}
+                  />
+                  <span className="truncate">{h.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {host && (
+          <label className="block">
+            <span className="text-gray-400">Gateway host</span>
+            <select
+              className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
+              value={gatewayHostId}
+              onChange={(e) => setGatewayHostId(e.target.value)}
+            >
+              <option value="">None (direct)</option>
+              {gatewayOptions.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label className="block">
           <span className="text-gray-400">Notes</span>
           <textarea
@@ -249,6 +306,16 @@ export function HostForm({ host, onSave, onCancel }: HostFormProps): React.JSX.E
             onChange={(e) => setNotes(e.target.value)}
           />
         </label>
+
+        {host && profiles && onProfilesChanged && onConnect && (
+          <HostProfilesSection
+            host={host}
+            profiles={profiles}
+            onConnect={onConnect}
+            onProfilesChanged={onProfilesChanged}
+          />
+        )}
+
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"

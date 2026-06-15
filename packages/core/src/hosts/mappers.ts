@@ -14,6 +14,8 @@ export function rowToHost(row: Record<string, unknown>): Host {
     defaultProfileId: (row.default_profile_id as string) || null,
     uxProfileId: (row.ux_profile_id as string) || null,
     logVerbosity: normalizeHostLogVerbosity(row.log_verbosity),
+    relatedHostIds: JSON.parse((row.related_hosts_json as string) || '[]'),
+    gatewayHostId: (row.gateway_host_id as string) || null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string
   }

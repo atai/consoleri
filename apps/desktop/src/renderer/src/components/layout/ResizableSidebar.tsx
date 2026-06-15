@@ -4,9 +4,10 @@ import { useAppStore } from '../../stores/appStore'
 
 interface ResizableSidebarProps {
   children: ReactNode
+  expanded?: boolean
 }
 
-export function ResizableSidebar({ children }: ResizableSidebarProps): React.JSX.Element {
+export function ResizableSidebar({ children, expanded = false }: ResizableSidebarProps): React.JSX.Element {
   const { sidebarWidth, setSidebarWidth } = useAppStore()
   const dragging = useRef(false)
   const startX = useRef(0)
@@ -40,6 +41,14 @@ export function ResizableSidebar({ children }: ResizableSidebarProps): React.JSX
   }, [setSidebarWidth])
 
   const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth))
+
+  if (expanded) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex h-full shrink-0" style={{ width: clamped }}>

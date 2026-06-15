@@ -4,28 +4,41 @@ import {
   hostListViewToGroupFilter,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
+  type AppView,
   type HostListGroupBy,
   type HostListGroupFilter,
   type HostListSortBy,
   type HostListSortDir,
-  type HostListViewSettings
+  type HostListViewSettings,
+  type MapViewMode,
+  type MapViewSettings
 } from '@consoleri/core'
 import type { Host, HostGroup, ConnectionProfile, SessionInfo, WorkspaceState, PaneBinding } from '@shared/types'
 
 const SETTINGS_KEY = 'consoleri.settings'
 const LAYOUT_SAVE_DEBOUNCE_MS = 300
 const HOST_LIST_VIEW_SAVE_DEBOUNCE_MS = 300
+const MAP_VIEW_SAVE_DEBOUNCE_MS = 300
 let sidebarPersistTimer: ReturnType<typeof setTimeout> | null = null
 let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null
 let hostListViewSaveTimer: ReturnType<typeof setTimeout> | null = null
+let mapViewSaveTimer: ReturnType<typeof setTimeout> | null = null
 let hostListViewReady = false
+let mapViewReady = false
+
+export type SessionOpenMode = 'workspace' | 'window'
 
 interface AppSettings {
   autoOpenConnectionLog: boolean
+  sessionOpenMode: SessionOpenMode
 }
 
 function loadSidebarWidth(): number {
   return 360
+}
+
+function normalizeSessionOpenMode(value: unknown): SessionOpenMode {
+  return value === 'window' ? 'window' : 'workspace'
 }
 
 function loadSettings(): AppSettings {
@@ -33,18 +46,26 @@ function loadSettings(): AppSettings {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppSettings>
-      return { autoOpenConnectionLog: parsed.autoOpenConnectionLog ?? false }
+      return {
+        autoOpenConnectionLog: parsed.autoOpenConnectionLog ?? false,
+        sessionOpenMode: normalizeSessionOpenMode(parsed.sessionOpenMode)
+      }
     }
   } catch {
     /* ignore */
   }
-  return { autoOpenConnectionLog: false }
+  return { autoOpenConnectionLog: false, sessionOpenMode: 'workspace' }
 }
 
-export type SidebarView = 'hosts' | 'keys' | 'profiles' | 'appearance'
+function persistSettings(settings: AppSettings): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+}
+
+export type SidebarView = 'hosts' | 'keys' | 'profiles'
 
 interface AppState {
   hosts: Host[]
+  allHosts: Host[]
   allHostTags: string[]
   groups: HostGroup[]
   profiles: ConnectionProfile[]
@@ -52,6 +73,10 @@ interface AppState {
   workspace: WorkspaceState
   hostListView: HostListViewSettings
   hostListViewLoaded: boolean
+  mapView: MapViewSettings
+  mapViewLoaded: boolean
+  appView: AppView
+  mapMode: MapViewMode
   selectedHostId: string | null
   search: string
   selectedTags: string[]
@@ -72,6 +97,8 @@ interface AppState {
   toggleCollapsedSection: (sectionId: string) => void
   setSelectedHostId: (id: string | null) => void
   setSidebarView: (view: SidebarView) => void
+  setAppView: (view: AppView) => void
+  setMapMode: (mode: MapViewMode) => void
   setHosts: (hosts: Host[]) => void
   setGroups: (groups: HostGroup[]) => void
   setProfiles: (profiles: ConnectionProfile[]) => void
@@ -83,8 +110,11 @@ interface AppState {
   setSidebarWidth: (width: number) => void
   setSidebarWidthFromProfile: (width: number) => void
   setAutoOpenConnectionLog: (value: boolean) => void
+  setSessionOpenMode: (mode: SessionOpenMode) => void
   loadHostListView: () => Promise<void>
+  loadMapView: () => Promise<void>
   refreshHosts: () => Promise<void>
+  refreshAllHosts: () => Promise<void>
   refreshAllHostTags: () => Promise<void>
   refreshGroups: () => Promise<void>
 }
@@ -135,8 +165,33 @@ function updateHostListView(
   scheduleHostListViewPersist(get)
 }
 
+function scheduleMapViewPersist(get: () => AppState): void {
+  if (!mapViewReady) return
+  if (mapViewSaveTimer) clearTimeout(mapViewSaveTimer)
+  mapViewSaveTimer = setTimeout(() => {
+    mapViewSaveTimer = null
+    const { mapView } = get()
+    void window.consoleri.preferences.setMapView(mapView)
+  }, MAP_VIEW_SAVE_DEBOUNCE_MS)
+}
+
+function updateMapView(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  patch: Partial<MapViewSettings>
+): void {
+  const nextView: MapViewSettings = { ...get().mapView, ...patch }
+  set({
+    mapView: nextView,
+    appView: nextView.appView,
+    mapMode: nextView.mapMode
+  })
+  scheduleMapViewPersist(get)
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   hosts: [],
+  allHosts: [],
   allHostTags: [],
   groups: [],
   profiles: [],
@@ -153,6 +208,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     sortDir: 'asc'
   },
   hostListViewLoaded: false,
+  mapView: {
+    version: 1,
+    appView: 'list',
+    mapMode: 'logical'
+  },
+  mapViewLoaded: false,
+  appView: 'list',
+  mapMode: 'logical',
   selectedHostId: null,
   search: '',
   selectedTags: [],
@@ -191,6 +254,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     updateHostListView(get, set, { selectedHostId })
   },
   setSidebarView: (sidebarView) => set({ sidebarView }),
+  setAppView: (appView) => {
+    updateMapView(get, set, { appView })
+  },
+  setMapMode: (mapMode) => {
+    updateMapView(get, set, { mapMode })
+  },
   setHosts: (hosts) => set({ hosts }),
   setGroups: (groups) => set({ groups }),
   setProfiles: (profiles) => set({ profiles }),
@@ -237,7 +306,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setAutoOpenConnectionLog: (autoOpenConnectionLog) => {
     const settings = { ...get().settings, autoOpenConnectionLog }
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+    persistSettings(settings)
+    set({ settings })
+  },
+  setSessionOpenMode: (sessionOpenMode) => {
+    const settings = { ...get().settings, sessionOpenMode }
+    persistSettings(settings)
     set({ settings })
   },
   loadHostListView: async () => {
@@ -246,6 +320,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       ...syncHostListViewFields(view),
       hostListViewLoaded: true
+    })
+  },
+  loadMapView: async () => {
+    const view = await window.consoleri.preferences.getMapView()
+    mapViewReady = true
+    set({
+      mapView: view,
+      appView: view.appView,
+      mapMode: view.mapMode,
+      mapViewLoaded: true
     })
   },
   refreshHosts: async () => {
@@ -269,7 +353,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const allHosts = await window.consoleri.hosts.list()
     const tagSet = new Set<string>()
     allHosts.forEach((host) => host.tags.forEach((tag) => tagSet.add(tag)))
-    set({ allHostTags: Array.from(tagSet).sort() })
+    set({ allHostTags: Array.from(tagSet).sort(), allHosts })
+  },
+  refreshAllHosts: async () => {
+    const allHosts = await window.consoleri.hosts.list()
+    set({ allHosts })
   },
   refreshGroups: async () => {
     const groups = await window.consoleri.groups.list()

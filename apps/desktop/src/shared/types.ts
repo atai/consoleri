@@ -3,7 +3,7 @@ export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection } from '@consoleri/core'
+export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView } from '@consoleri/core'
 import type { HostLogVerbosity } from '@consoleri/core'
 
 export interface LogEntry {
@@ -34,6 +34,8 @@ export interface Host {
   defaultProfileId: string | null
   uxProfileId: string | null
   logVerbosity: HostLogVerbosity
+  relatedHostIds: string[]
+  gatewayHostId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -114,6 +116,8 @@ export interface HostInput {
   defaultProfileId?: string | null
   uxProfileId?: string | null
   logVerbosity?: HostLogVerbosity
+  relatedHostIds?: string[]
+  gatewayHostId?: string | null
 }
 
 export interface ProfileInput {
@@ -216,6 +220,7 @@ export const IPC_CHANNELS = {
   sessionsResize: 'sessions:resize',
   sessionsList: 'sessions:list',
   sessionsReconnect: 'sessions:reconnect',
+  sessionsGetConnectRequest: 'sessions:get-connect-request',
   sessionsSnapshot: 'sessions:snapshot',
   sessionsRdpCredentials: 'sessions:rdp-credentials',
   sessionsVncPassword: 'sessions:vnc-password',
@@ -229,6 +234,7 @@ export const IPC_CHANNELS = {
   sessionLog: 'session:log',
   sessionsLogGet: 'sessions:log:get',
   sessionsLogOpenWindow: 'sessions:log:openWindow',
+  sessionsOpenSessionWindow: 'sessions:openSessionWindow',
   keysList: 'keys:list',
   keysAdd: 'keys:add',
   keysRemove: 'keys:remove',
@@ -251,6 +257,8 @@ export const IPC_CHANNELS = {
   uxProfilesMigrateSidebarWidth: 'uxProfiles:migrate-sidebar-width',
   preferencesGetHostListView: 'preferences:get-host-list-view',
   preferencesSetHostListView: 'preferences:set-host-list-view',
+  preferencesGetMapView: 'preferences:get-map-view',
+  preferencesSetMapView: 'preferences:set-map-view',
   clipboardReadText: 'clipboard:readText',
   clipboardWriteText: 'clipboard:writeText'
 } as const

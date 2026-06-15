@@ -2,7 +2,6 @@ import { useAppStore } from '../../stores/appStore'
 import { HostBrowser } from '../hosts/HostBrowser'
 import { KeyManager } from '../keys/KeyManager'
 import { ProfileManager } from '../profiles/ProfileManager'
-import { UxProfileManager } from '../ux/UxProfileManager'
 
 export function Sidebar(): React.JSX.Element {
   const { sidebarView, setSidebarView } = useAppStore()
@@ -26,15 +25,11 @@ export function Sidebar(): React.JSX.Element {
         <button type="button" onClick={() => setSidebarView('keys')} className={tabClass('keys')}>
           Keys
         </button>
-        <button type="button" onClick={() => setSidebarView('appearance')} className={tabClass('appearance')}>
-          Look
-        </button>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         {sidebarView === 'hosts' && <HostBrowser />}
         {sidebarView === 'profiles' && <ProfileManager />}
         {sidebarView === 'keys' && <KeyManager />}
-        {sidebarView === 'appearance' && <UxProfileManager />}
       </div>
     </div>
   )

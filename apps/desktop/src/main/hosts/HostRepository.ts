@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { isKeyFileRef, normalizeHostLogVerbosity, rowToHost, rowToProfile } from '@consoleri/core'
+import { isKeyFileRef, normalizeHostLogVerbosity, normalizeGatewayHostId, normalizeRelatedHostIds, rowToHost, rowToProfile } from '@consoleri/core'
 import type {
   ConnectionProfile,
   Host,
@@ -16,6 +16,15 @@ import { getDatabase } from '../db/database'
 import { credentialVault } from './CredentialVault'
 
 export class HostRepository {
+  private existingHostIdSet(): Set<string> {
+    const rows = getDatabase().prepare('SELECT id FROM hosts').all() as Array<{ id: string }>
+    return new Set(rows.map((r) => r.id))
+  }
+
+  private existingHostsForGateway(): Array<{ id: string; gatewayHostId: string | null }> {
+    return this.listHosts().map((h) => ({ id: h.id, gatewayHostId: h.gatewayHostId }))
+  }
+
   listHosts(filter: HostFilter = {}): Host[] {
     const db = getDatabase()
     let sql = 'SELECT * FROM hosts WHERE 1=1'
@@ -55,9 +64,12 @@ export class HostRepository {
     const id = nanoid()
     const now = new Date().toISOString()
     const db = getDatabase()
+    const existingIds = this.existingHostIdSet()
+    const relatedHostIds = normalizeRelatedHostIds(id, input.relatedHostIds, existingIds)
+    const gatewayHostId = normalizeGatewayHostId(id, input.gatewayHostId ?? null, this.existingHostsForGateway())
     db.prepare(
-      `INSERT INTO hosts (id, name, hostname, port, os_type, tags_json, group_id, notes, default_profile_id, ux_profile_id, log_verbosity, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO hosts (id, name, hostname, port, os_type, tags_json, group_id, notes, default_profile_id, ux_profile_id, log_verbosity, related_hosts_json, gateway_host_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.name,
@@ -70,6 +82,8 @@ export class HostRepository {
       input.defaultProfileId ?? null,
       input.uxProfileId ?? null,
       normalizeHostLogVerbosity(input.logVerbosity),
+      JSON.stringify(relatedHostIds),
+      gatewayHostId,
       now,
       now
     )
@@ -80,9 +94,18 @@ export class HostRepository {
     const existing = this.getHost(id)
     if (!existing) throw new Error(`Host not found: ${id}`)
     const now = new Date().toISOString()
+    const existingIds = this.existingHostIdSet()
+    const relatedHostIds =
+      input.relatedHostIds !== undefined
+        ? normalizeRelatedHostIds(id, input.relatedHostIds, existingIds)
+        : existing.relatedHostIds
+    const gatewayHostId =
+      input.gatewayHostId !== undefined
+        ? normalizeGatewayHostId(id, input.gatewayHostId, this.existingHostsForGateway())
+        : existing.gatewayHostId
     getDatabase()
       .prepare(
-        `UPDATE hosts SET name=?, hostname=?, port=?, os_type=?, tags_json=?, group_id=?, notes=?, default_profile_id=?, ux_profile_id=?, log_verbosity=?, updated_at=? WHERE id=?`
+        `UPDATE hosts SET name=?, hostname=?, port=?, os_type=?, tags_json=?, group_id=?, notes=?, default_profile_id=?, ux_profile_id=?, log_verbosity=?, related_hosts_json=?, gateway_host_id=?, updated_at=? WHERE id=?`
       )
       .run(
         input.name ?? existing.name,
@@ -97,6 +120,8 @@ export class HostRepository {
         input.logVerbosity !== undefined
           ? normalizeHostLogVerbosity(input.logVerbosity)
           : existing.logVerbosity,
+        JSON.stringify(relatedHostIds),
+        gatewayHostId,
         now,
         id
       )

@@ -125,6 +125,7 @@ export function getDatabase(): DatabaseSync {
   migrateHostProfileLinks(db)
   migrateHostLogVerbosity(db)
   migrateUxProfiles(db)
+  migrateHostRelations(db)
 
   const workspaceCount = db.prepare('SELECT COUNT(*) as c FROM workspaces').get() as { c: number }
   if (workspaceCount.c === 0) {
@@ -200,6 +201,18 @@ function migrateUxProfiles(database: DatabaseSync): void {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`
       )
       .run('active_ux_profile_id', BUILTIN_UX_PROFILE_ID)
+  }
+}
+
+function migrateHostRelations(database: DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(hosts)').all() as Array<{ name: string }>
+  if (!columns.some((column) => column.name === 'related_hosts_json')) {
+    database.exec(`ALTER TABLE hosts ADD COLUMN related_hosts_json TEXT NOT NULL DEFAULT '[]'`)
+  }
+  if (!columns.some((column) => column.name === 'gateway_host_id')) {
+    database.exec(
+      `ALTER TABLE hosts ADD COLUMN gateway_host_id TEXT REFERENCES hosts(id) ON DELETE SET NULL`
+    )
   }
 }
 

@@ -8,11 +8,12 @@ import { credentialVault } from '../hosts/CredentialVault'
 import { sessionManager } from '../sessions/SessionManager'
 import { listWslDistros } from '../sessions/shellUtils'
 import { openLogWindow } from '../windows/LogWindow'
+import { openSessionWindow } from '../windows/SessionWindow'
 import { sshKeyService } from '../keys/SshKeyService'
 import { sshKeyDeployer } from '../keys/SshKeyDeployer'
 import { migrateSidebarWidthFromRenderer } from '../db/database'
 import { appPreferencesRepository } from '../preferences/AppPreferencesRepository'
-import type { HostListViewSettings } from '@consoleri/core'
+import type { HostListViewSettings, MapViewSettings } from '@consoleri/core'
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC_CHANNELS.hostsList, (_e, filter: HostFilter) => {
@@ -112,6 +113,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return sessionManager.reconnect(sessionId)
   })
 
+  ipcMain.handle(IPC_CHANNELS.sessionsGetConnectRequest, (_e, sessionId: string) => {
+    return sessionManager.getConnectRequest(sessionId)
+  })
+
   ipcMain.handle(IPC_CHANNELS.sessionsRdpCredentials, async (_e, profileId: string) => {
     return sessionManager.getCredentialsForRdp(profileId)
   })
@@ -154,6 +159,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   ipcMain.handle(IPC_CHANNELS.sessionsLogOpenWindow, (_e, sessionId: string) => {
     openLogWindow(sessionId, getWindow())
+  })
+
+  ipcMain.handle(IPC_CHANNELS.sessionsOpenSessionWindow, (_e, sessionId: string) => {
+    openSessionWindow(sessionId, getWindow())
   })
 
   ipcMain.handle(IPC_CHANNELS.workspaceGetActive, () => hostRepository.getActiveWorkspace())
@@ -249,6 +258,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
       return appPreferencesRepository.setHostListView(patch)
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.preferencesGetMapView, () => {
+    return appPreferencesRepository.getMapView()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.preferencesSetMapView, (_e, patch: Partial<MapViewSettings>) => {
+    return appPreferencesRepository.setMapView(patch)
+  })
 
   ipcMain.handle(IPC_CHANNELS.clipboardWriteText, (_e, text: string) => {
     clipboard.writeText(text)

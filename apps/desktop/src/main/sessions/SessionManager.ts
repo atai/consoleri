@@ -24,6 +24,7 @@ export class SessionManager {
   private sessions = new Map<string, ManagedSession>()
   private window: BrowserWindow | null = null
   private logWindow: BrowserWindow | null = null
+  private sessionWindows = new Map<string, BrowserWindow>()
 
   setWindow(win: BrowserWindow): void {
     this.window = win
@@ -33,6 +34,13 @@ export class SessionManager {
     return Array.from(this.sessions.values()).map((s) => s.info)
   }
 
+  getConnectRequest(sessionId: string): OpenSessionRequest | null {
+    const existing = this.sessions.get(sessionId)
+    if (!existing?.reconnectMeta) return null
+    const { cols: _cols, rows: _rows, ...request } = existing.reconnectMeta
+    return request
+  }
+
   private send(channel: string, payload: unknown): void {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(channel, payload)
@@ -40,6 +48,38 @@ export class SessionManager {
     if (this.logWindow && !this.logWindow.isDestroyed()) {
       this.logWindow.webContents.send(channel, payload)
     }
+
+    const sessionId = this.extractSessionId(channel, payload)
+    if (sessionId) {
+      const sessionWin = this.sessionWindows.get(sessionId)
+      if (sessionWin && !sessionWin.isDestroyed()) {
+        sessionWin.webContents.send(channel, payload)
+      }
+    }
+  }
+
+  private extractSessionId(channel: string, payload: unknown): string | null {
+    if (typeof payload !== 'object' || payload === null) return null
+    const record = payload as Record<string, unknown>
+    if (channel === IPC_CHANNELS.sessionLog) {
+      return typeof record.sessionId === 'string' ? record.sessionId : null
+    }
+    if (
+      channel === IPC_CHANNELS.sessionData ||
+      channel === IPC_CHANNELS.sessionStatus ||
+      channel === IPC_CHANNELS.sessionExit
+    ) {
+      return typeof record.id === 'string' ? record.id : null
+    }
+    return null
+  }
+
+  registerSessionWindow(sessionId: string, win: BrowserWindow): void {
+    this.sessionWindows.set(sessionId, win)
+  }
+
+  unregisterSessionWindow(sessionId: string): void {
+    this.sessionWindows.delete(sessionId)
   }
 
   private appendLog(sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
@@ -202,6 +242,14 @@ export class SessionManager {
     session.vncProxy?.stop()
     connectionLog.removeSession(sessionId)
     this.sessions.delete(sessionId)
+    this.send(IPC_CHANNELS.sessionExit, { id: sessionId, code: 0 })
+
+    const sessionWin = this.sessionWindows.get(sessionId)
+    if (sessionWin && !sessionWin.isDestroyed()) {
+      sessionWin.removeAllListeners('closed')
+      sessionWin.close()
+    }
+    this.sessionWindows.delete(sessionId)
   }
 
   closeAll(): void {

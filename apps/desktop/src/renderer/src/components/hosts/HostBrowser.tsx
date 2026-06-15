@@ -6,7 +6,8 @@ import { HostActionsMenu } from './HostActionsMenu'
 import { HostForm } from './HostForm'
 import { HostDetailPanel } from './HostDetailPanel'
 import { HostListSection } from './HostListSection'
-import { openSessionAndAddToWorkspace } from '../../session/openSession'
+import { connectFromList, openLocalSessionFromList } from '../../session/connectHost'
+import { SessionOpenModeToggle } from './SessionOpenModeToggle'
 
 const GROUP_BY_OPTIONS: Array<{ value: HostListGroupBy; label: string }> = [
   { value: 'none', label: 'None' },
@@ -51,9 +52,11 @@ export function HostBrowser(): React.JSX.Element {
     toggleCollapsedSection,
     setSelectedHostId,
     setAutoOpenConnectionLog,
+    setSessionOpenMode,
     loadHostListView,
     refreshHosts,
     refreshAllHostTags,
+    refreshAllHosts,
     refreshGroups
   } = useAppStore()
 
@@ -74,12 +77,14 @@ export function HostBrowser(): React.JSX.Element {
     refreshHosts()
     refreshGroups()
     refreshAllHostTags()
+    refreshAllHosts()
     window.consoleri.wsl.list().then(setWslDistros)
   }, [
     hostListViewLoaded,
     refreshHosts,
     refreshGroups,
     refreshAllHostTags,
+    refreshAllHosts,
     search,
     selectedTags,
     selectedGroupId
@@ -110,24 +115,15 @@ export function HostBrowser(): React.JSX.Element {
     }
   }
 
-  const connectHost = async (host: Host, profileId?: string): Promise<void> => {
-    const hostProfiles = await window.consoleri.profiles.list(host.id)
-    const profile = profileId
-      ? hostProfiles.find((p) => p.id === profileId)
-      : host.defaultProfileId
-        ? hostProfiles.find((p) => p.id === host.defaultProfileId)
-        : hostProfiles[0]
-    await openSessionAndAddToWorkspace({
-      hostId: host.id,
-      profileId: profile?.id
-    })
+  const connectHostHandler = async (host: Host, profileId?: string): Promise<void> => {
+    await connectFromList(host, profileId)
   }
 
   const openLocalShell = async (
     shell: 'powershell' | 'pwsh' | 'cmd' | 'bash' | 'wsl',
     wslDistro?: string
   ): Promise<void> => {
-    await openSessionAndAddToWorkspace({
+    await openLocalSessionFromList({
       localShell: shell,
       wslDistro,
       title: shell === 'wsl' ? `WSL ${wslDistro ?? ''}` : shell
@@ -148,6 +144,7 @@ export function HostBrowser(): React.JSX.Element {
       setShowImport(false)
       refreshHosts()
       refreshAllHostTags()
+    refreshAllHosts()
     } catch {
       alert('Invalid JSON')
     }
@@ -163,6 +160,7 @@ export function HostBrowser(): React.JSX.Element {
     }
     refreshHosts()
     refreshAllHostTags()
+    refreshAllHosts()
   }
 
   const startEditHost = (hostId: string): void => {
@@ -193,6 +191,11 @@ export function HostBrowser(): React.JSX.Element {
             onOpenBash={() => openLocalShell('bash')}
             wslDistros={wslDistros}
             onOpenWsl={(distro) => openLocalShell('wsl', distro)}
+          />
+
+          <SessionOpenModeToggle
+            mode={settings.sessionOpenMode}
+            onChange={setSessionOpenMode}
           />
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
@@ -327,6 +330,7 @@ export function HostBrowser(): React.JSX.Element {
                 setShowForm(false)
                 refreshHosts()
                 refreshAllHostTags()
+    refreshAllHosts()
               }}
               onCancel={() => setShowForm(false)}
             />
@@ -346,7 +350,7 @@ export function HostBrowser(): React.JSX.Element {
               selectedHostId={selectedHostId}
               onToggleCollapsed={() => toggleCollapsedSection(section.id)}
               onSelect={setSelectedHostId}
-              onConnect={connectHost}
+              onConnect={connectHostHandler}
               onEdit={startEditHost}
               onDelete={handleDeleteHost}
             />
@@ -360,7 +364,7 @@ export function HostBrowser(): React.JSX.Element {
           profiles={profiles}
           autoOpenConnectionLog={settings.autoOpenConnectionLog}
           editing={editingHostId === selectedHost.id}
-          onConnect={connectHost}
+          onConnect={connectHostHandler}
           onDelete={handleDeleteHost}
           onAutoOpenLogChange={setAutoOpenConnectionLog}
           onEdit={() => startEditHost(selectedHost.id)}
@@ -368,12 +372,14 @@ export function HostBrowser(): React.JSX.Element {
           onHostUpdated={() => {
             refreshHosts()
             refreshAllHostTags()
+    refreshAllHosts()
             refreshProfiles()
           }}
           onProfilesChanged={() => {
             refreshProfiles()
             refreshHosts()
             refreshAllHostTags()
+    refreshAllHosts()
           }}
         />
       )}

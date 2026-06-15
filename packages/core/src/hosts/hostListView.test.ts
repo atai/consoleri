@@ -22,6 +22,8 @@ function makeHost(overrides: Partial<Host> & Pick<Host, 'id' | 'name'>): Host {
     defaultProfileId: null,
     uxProfileId: null,
     logVerbosity: 'info',
+    relatedHostIds: [],
+    gatewayHostId: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides

@@ -15,12 +15,16 @@ describe('rowToHost', () => {
       default_profile_id: null,
       ux_profile_id: null,
       log_verbosity: 'info',
+      related_hosts_json: '["db"]',
+      gateway_host_id: 'gw1',
       created_at: '2024-01-01',
       updated_at: '2024-01-02'
     })
     expect(host.name).toBe('web')
     expect(host.tags).toEqual(['prod'])
     expect(host.logVerbosity).toBe('info')
+    expect(host.relatedHostIds).toEqual(['db'])
+    expect(host.gatewayHostId).toBe('gw1')
   })
 })
 

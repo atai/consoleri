@@ -19,7 +19,8 @@ import type {
   WslDistro,
   UxProfile,
   UxProfileInput,
-  HostListViewSettings
+  HostListViewSettings,
+  MapViewSettings
 } from '../shared/types'
 
 export interface ConsoleriAPI {
@@ -60,6 +61,7 @@ export interface ConsoleriAPI {
     resize: (sessionId: string, cols: number, rows: number) => Promise<void>
     list: () => Promise<SessionInfo[]>
     reconnect: (sessionId: string) => Promise<SessionInfo | null>
+    getConnectRequest: (sessionId: string) => Promise<OpenSessionRequest | null>
     snapshot: (snapshot: {
       id: string
       hostId: string | null
@@ -75,6 +77,7 @@ export interface ConsoleriAPI {
     getVncPassword: (profileId: string) => Promise<string | null>
     getLog: (sessionId: string) => Promise<LogEntry[]>
     openLogWindow: (sessionId: string) => Promise<void>
+    openSessionWindow: (sessionId: string) => Promise<void>
     onData: (cb: (payload: { id: string; data: string }) => void) => () => void
     onExit: (cb: (payload: { id: string; code: number }) => void) => () => void
     onStatus: (cb: (payload: { id: string; status: string; error?: string }) => void) => () => void
@@ -119,6 +122,8 @@ export interface ConsoleriAPI {
   preferences: {
     getHostListView: () => Promise<HostListViewSettings>
     setHostListView: (patch: Partial<HostListViewSettings>) => Promise<HostListViewSettings>
+    getMapView: () => Promise<MapViewSettings>
+    setMapView: (patch: Partial<MapViewSettings>) => Promise<MapViewSettings>
   }
 }
 
@@ -159,6 +164,8 @@ const consoleri: ConsoleriAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.sessionsResize, sessionId, cols, rows),
     list: () => ipcRenderer.invoke(IPC_CHANNELS.sessionsList),
     reconnect: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.sessionsReconnect, sessionId),
+    getConnectRequest: (sessionId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.sessionsGetConnectRequest, sessionId),
     snapshot: (snapshot) => ipcRenderer.invoke(IPC_CHANNELS.sessionsSnapshot, snapshot),
     getRdpCredentials: (profileId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.sessionsRdpCredentials, profileId),
@@ -167,6 +174,8 @@ const consoleri: ConsoleriAPI = {
     getLog: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.sessionsLogGet, sessionId),
     openLogWindow: (sessionId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.sessionsLogOpenWindow, sessionId),
+    openSessionWindow: (sessionId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.sessionsOpenSessionWindow, sessionId),
     onData: (cb) => {
       const listener = (_: unknown, payload: { id: string; data: string }) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.sessionData, listener)
@@ -231,7 +240,9 @@ const consoleri: ConsoleriAPI = {
   },
   preferences: {
     getHostListView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetHostListView),
-    setHostListView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetHostListView, patch)
+    setHostListView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetHostListView, patch),
+    getMapView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetMapView),
+    setMapView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetMapView, patch)
   }
 }
 

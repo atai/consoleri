@@ -47,7 +47,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          'log-window/index': resolve('src/renderer/log-window/index.html')
+          'log-window/index': resolve('src/renderer/log-window/index.html'),
+          'session-window/index': resolve('src/renderer/session-window/index.html')
         }
       }
     }

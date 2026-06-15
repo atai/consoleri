@@ -16,6 +16,8 @@ export interface Host {
   defaultProfileId: string | null
   uxProfileId: string | null
   logVerbosity: HostLogVerbosity
+  relatedHostIds: string[]
+  gatewayHostId: string | null
   createdAt: string
   updatedAt: string
 }
