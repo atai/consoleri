@@ -25,7 +25,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/preload/index.ts'),
-          log: resolve('src/preload/log.ts')
+          log: resolve('src/preload/log.ts'),
+          report: resolve('src/preload/report.ts')
         }
       }
     }
@@ -48,7 +49,8 @@ export default defineConfig({
         input: {
           index: resolve('src/renderer/index.html'),
           'log-window/index': resolve('src/renderer/log-window/index.html'),
-          'session-window/index': resolve('src/renderer/session-window/index.html')
+          'session-window/index': resolve('src/renderer/session-window/index.html'),
+          'report-window/index': resolve('src/renderer/report-window/index.html')
         }
       }
     }

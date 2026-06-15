@@ -1,0 +1,29 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC_CHANNELS } from '../shared/types'
+import type {
+  ConnectivityTestResult,
+  Report,
+  ReportProgressEvent
+} from '../shared/types'
+
+const reportApi = {
+  getReportId: (): string => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reportId') ?? ''
+  },
+  getReport: (reportId: string): Promise<Report | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.reportsGet, reportId),
+  run: (reportId: string): Promise<ConnectivityTestResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.reportsRun, reportId),
+  onProgress: (cb: (event: ReportProgressEvent) => void): (() => void) => {
+    const listener = (_: unknown, event: ReportProgressEvent) => cb(event)
+    ipcRenderer.on(IPC_CHANNELS.reportProgress, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.reportProgress, listener)
+  },
+  writeClipboard: (text: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text),
+  listHosts: () => ipcRenderer.invoke(IPC_CHANNELS.hostsList),
+  listProfiles: (hostId?: string) => ipcRenderer.invoke(IPC_CHANNELS.profilesList, hostId)
+}
+
+contextBridge.exposeInMainWorld('reportApi', reportApi)

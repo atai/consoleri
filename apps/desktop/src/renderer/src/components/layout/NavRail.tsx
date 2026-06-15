@@ -1,10 +1,11 @@
 import type { AppView } from '@consoleri/core'
 import type { LucideIcon } from 'lucide-react'
-import { LayoutList, Network, Palette } from 'lucide-react'
+import { LayoutList, Network, Palette, ClipboardCheck } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 
 const MAIN_NAV_ITEMS: Array<{ view: AppView; label: string; title: string; Icon: LucideIcon }> = [
   { view: 'list', label: 'List', title: 'Host list and sessions', Icon: LayoutList },
+  { view: 'reports', label: 'Reports', title: 'Host reports', Icon: ClipboardCheck },
   { view: 'map', label: 'Map', title: 'Network map', Icon: Network }
 ]
 

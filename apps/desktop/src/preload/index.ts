@@ -20,7 +20,11 @@ import type {
   UxProfile,
   UxProfileInput,
   HostListViewSettings,
-  MapViewSettings
+  MapViewSettings,
+  Report,
+  ReportInput,
+  ConnectivityTestResult,
+  ReportProgressEvent
 } from '../shared/types'
 
 export interface ConsoleriAPI {
@@ -124,6 +128,17 @@ export interface ConsoleriAPI {
     setHostListView: (patch: Partial<HostListViewSettings>) => Promise<HostListViewSettings>
     getMapView: () => Promise<MapViewSettings>
     setMapView: (patch: Partial<MapViewSettings>) => Promise<MapViewSettings>
+  }
+  reports: {
+    list: () => Promise<Report[]>
+    get: (id: string) => Promise<Report | null>
+    create: (input: ReportInput) => Promise<Report>
+    update: (id: string, patch: Partial<ReportInput>) => Promise<Report>
+    delete: (id: string) => Promise<void>
+    run: (reportId: string) => Promise<ConnectivityTestResult>
+    openWindow: (reportId: string) => Promise<void>
+    onProgress: (cb: (event: ReportProgressEvent) => void) => () => void
+    onUpdated: (cb: (report: Report) => void) => () => void
   }
 }
 
@@ -243,6 +258,25 @@ const consoleri: ConsoleriAPI = {
     setHostListView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetHostListView, patch),
     getMapView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetMapView),
     setMapView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetMapView, patch)
+  },
+  reports: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.reportsList),
+    get: (id) => ipcRenderer.invoke(IPC_CHANNELS.reportsGet, id),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.reportsCreate, input),
+    update: (id, patch) => ipcRenderer.invoke(IPC_CHANNELS.reportsUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.reportsDelete, id),
+    run: (reportId) => ipcRenderer.invoke(IPC_CHANNELS.reportsRun, reportId),
+    openWindow: (reportId) => ipcRenderer.invoke(IPC_CHANNELS.reportsOpenWindow, reportId),
+    onProgress: (cb) => {
+      const listener = (_: unknown, event: ReportProgressEvent) => cb(event)
+      ipcRenderer.on(IPC_CHANNELS.reportProgress, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.reportProgress, listener)
+    },
+    onUpdated: (cb) => {
+      const listener = (_: unknown, report: Report) => cb(report)
+      ipcRenderer.on(IPC_CHANNELS.reportUpdated, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.reportUpdated, listener)
+    }
   }
 }
 

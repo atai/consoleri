@@ -126,6 +126,7 @@ export function getDatabase(): DatabaseSync {
   migrateHostLogVerbosity(db)
   migrateUxProfiles(db)
   migrateHostRelations(db)
+  migrateReports(db)
 
   const workspaceCount = db.prepare('SELECT COUNT(*) as c FROM workspaces').get() as { c: number }
   if (workspaceCount.c === 0) {
@@ -214,6 +215,21 @@ function migrateHostRelations(database: DatabaseSync): void {
       `ALTER TABLE hosts ADD COLUMN gateway_host_id TEXT REFERENCES hosts(id) ON DELETE SET NULL`
     )
   }
+}
+
+function migrateReports(database: DatabaseSync): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      last_run_at TEXT,
+      last_result_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `)
 }
 
 export function migrateSidebarWidthFromRenderer(width: number): void {

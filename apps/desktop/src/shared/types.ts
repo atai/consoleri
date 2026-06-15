@@ -3,7 +3,7 @@ export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView } from '@consoleri/core'
+export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, ReportProgressEvent } from '@consoleri/core'
 import type { HostLogVerbosity } from '@consoleri/core'
 
 export interface LogEntry {
@@ -259,6 +259,15 @@ export const IPC_CHANNELS = {
   preferencesSetHostListView: 'preferences:set-host-list-view',
   preferencesGetMapView: 'preferences:get-map-view',
   preferencesSetMapView: 'preferences:set-map-view',
+  reportsList: 'reports:list',
+  reportsGet: 'reports:get',
+  reportsCreate: 'reports:create',
+  reportsUpdate: 'reports:update',
+  reportsDelete: 'reports:delete',
+  reportsRun: 'reports:run',
+  reportsOpenWindow: 'reports:openWindow',
+  reportProgress: 'report:progress',
+  reportUpdated: 'report:updated',
   clipboardReadText: 'clipboard:readText',
   clipboardWriteText: 'clipboard:writeText'
 } as const

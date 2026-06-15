@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar'
 import { MosaicWorkspace } from '../workspace/MosaicWorkspace'
 import { HostMapView } from '../map/HostMapView'
 import { UxProfileManager } from '../ux/UxProfileManager'
+import { ReportsManager } from '../reports/ReportsManager'
 import { useAppStore } from '../../stores/appStore'
 import { useUxProfileStore } from '../../stores/uxProfileStore'
 
@@ -99,6 +100,11 @@ export function AppShell({ workspaceReady }: AppShellProps): React.JSX.Element {
       {appView === 'map' && (
         <main className="min-h-0 min-w-0 flex-1">
           <HostMapView />
+        </main>
+      )}
+      {appView === 'reports' && (
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#161b22]">
+          <ReportsManager />
         </main>
       )}
       {appView === 'profile' && (

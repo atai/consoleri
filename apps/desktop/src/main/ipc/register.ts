@@ -1,18 +1,21 @@
 import { ipcMain, clipboard, type BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
 import { IPC_CHANNELS } from '../../shared/types'
-import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState, DeployKeyRequest } from '../../shared/types'
+import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState, DeployKeyRequest, ReportInput } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
 import { credentialVault } from '../hosts/CredentialVault'
 import { sessionManager } from '../sessions/SessionManager'
 import { listWslDistros } from '../sessions/shellUtils'
 import { openLogWindow } from '../windows/LogWindow'
+import { openReportWindow } from '../windows/ReportWindow'
 import { openSessionWindow } from '../windows/SessionWindow'
 import { sshKeyService } from '../keys/SshKeyService'
 import { sshKeyDeployer } from '../keys/SshKeyDeployer'
 import { migrateSidebarWidthFromRenderer } from '../db/database'
 import { appPreferencesRepository } from '../preferences/AppPreferencesRepository'
+import { reportRepository } from '../reports/ReportRepository'
+import { reportRunner } from '../reports/ReportRunner'
 import type { HostListViewSettings, MapViewSettings } from '@consoleri/core'
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
@@ -269,5 +272,27 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   ipcMain.handle(IPC_CHANNELS.clipboardWriteText, (_e, text: string) => {
     clipboard.writeText(text)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.reportsList, () => reportRepository.list())
+
+  ipcMain.handle(IPC_CHANNELS.reportsGet, (_e, id: string) => reportRepository.get(id))
+
+  ipcMain.handle(IPC_CHANNELS.reportsCreate, (_e, input: ReportInput) =>
+    reportRepository.create(input)
+  )
+
+  ipcMain.handle(IPC_CHANNELS.reportsUpdate, (_e, id: string, patch: Partial<ReportInput>) =>
+    reportRepository.update(id, patch)
+  )
+
+  ipcMain.handle(IPC_CHANNELS.reportsDelete, (_e, id: string) => {
+    reportRepository.delete(id)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.reportsRun, (_e, reportId: string) => reportRunner.run(reportId))
+
+  ipcMain.handle(IPC_CHANNELS.reportsOpenWindow, (_e, reportId: string) => {
+    openReportWindow(reportId, getWindow())
   })
 }

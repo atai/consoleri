@@ -1,4 +1,4 @@
-import { Client, type ConnectConfig } from 'ssh2'
+import { Client } from 'ssh2'
 import { existsSync, readFileSync } from 'fs'
 import { nanoid } from 'nanoid'
 import {
@@ -9,91 +9,14 @@ import {
 import type { DeployKeyRequest, DeployKeyResult } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import { sessionManager } from '../sessions/SessionManager'
+import { credentialResolver, findSshProfile } from '../services/CredentialResolver'
 import {
-  credentialResolver,
-  findSshProfile,
-  type ResolvedCredentials
-} from '../services/CredentialResolver'
+  connectSshClient,
+  connectSshViaJump,
+  toSshConnectConfig
+} from '../sessions/SshConnectHelper'
 
 const EXEC_TIMEOUT_MS = 30_000
-const CONNECT_TIMEOUT_MS = 20_000
-
-function toConnectConfig(
-  hostname: string,
-  port: number,
-  credentials: ResolvedCredentials
-): ConnectConfig {
-  return {
-    host: hostname,
-    port,
-    username: credentials.username || 'root',
-    password: credentials.password,
-    privateKey: credentials.privateKey,
-    passphrase: credentials.passphrase,
-    readyTimeout: CONNECT_TIMEOUT_MS
-  }
-}
-
-function connectClient(config: ConnectConfig): Promise<Client> {
-  return new Promise((resolve, reject) => {
-    const client = new Client()
-    const timer = setTimeout(() => {
-      client.end()
-      reject(new Error(`SSH connection timed out after ${CONNECT_TIMEOUT_MS / 1000}s`))
-    }, CONNECT_TIMEOUT_MS + 2000)
-
-    client
-      .on('ready', () => {
-        clearTimeout(timer)
-        resolve(client)
-      })
-      .on('error', (err) => {
-        clearTimeout(timer)
-        reject(err)
-      })
-      .connect(config)
-  })
-}
-
-async function connectViaJump(
-  bastionConfig: ConnectConfig,
-  targetConfig: ConnectConfig
-): Promise<Client> {
-  const bastion = await connectClient(bastionConfig)
-  return new Promise((resolve, reject) => {
-    bastion.forwardOut(
-      '127.0.0.1',
-      0,
-      targetConfig.host!,
-      targetConfig.port ?? 22,
-      (err, stream) => {
-        if (err) {
-          bastion.end()
-          reject(err)
-          return
-        }
-        const target = new Client()
-        const timer = setTimeout(() => {
-          bastion.end()
-          target.end()
-          reject(new Error(`SSH connection via jump host timed out after ${CONNECT_TIMEOUT_MS / 1000}s`))
-        }, CONNECT_TIMEOUT_MS + 2000)
-
-        target
-          .on('ready', () => {
-            clearTimeout(timer)
-            resolve(target)
-          })
-          .on('error', (e) => {
-            clearTimeout(timer)
-            bastion.end()
-            reject(e)
-          })
-        target.connect({ ...targetConfig, sock: stream })
-      }
-    )
-  })
-}
 
 function execCommand(
   client: Client,
@@ -186,7 +109,7 @@ export class SshKeyDeployer {
       return { success: false, message, logId }
     }
 
-    const targetConfig = toConnectConfig(
+    const targetConfig = toSshConnectConfig(
       host.hostname,
       host.port || defaultPortForProtocol('ssh'),
       credentials
@@ -208,15 +131,15 @@ export class SshKeyDeployer {
           return { success: false, message: 'Jump host has no SSH profile', logId }
         }
         const jumpCredentials = await credentialResolver.resolveForProfile(jumpProfile)
-        const bastionConfig = toConnectConfig(
+        const bastionConfig = toSshConnectConfig(
           jumpHost.hostname,
           jumpHost.port || defaultPortForProtocol('ssh'),
           jumpCredentials
         )
-        client = await connectViaJump(bastionConfig, targetConfig)
+        client = await connectSshViaJump(bastionConfig, targetConfig)
       } else {
         log('info', 'Connecting via SSH…')
-        client = await connectClient(targetConfig)
+        client = await connectSshClient(targetConfig)
       }
       log('info', 'SSH connection established')
     } catch (e) {
