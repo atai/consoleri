@@ -1,7 +1,10 @@
+import { isKeyFileRef } from '../keys/credentialRef'
+
 export type AuthMaterialType = 'password' | 'privateKey' | 'none'
 
 export function authTypeFromCredentialRef(credentialRef: string | null): AuthMaterialType {
   if (!credentialRef) return 'none'
+  if (isKeyFileRef(credentialRef)) return 'privateKey'
   if (credentialRef.includes(':key')) return 'privateKey'
   return 'password'
 }

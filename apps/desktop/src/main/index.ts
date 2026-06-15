@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { APP_NAME, appIconPath } from './appBranding'
 import { getDatabase, closeDatabase } from './db/database'
 import { registerIpcHandlers } from './ipc/register'
 import { sessionManager } from './sessions/SessionManager'
@@ -15,7 +16,8 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    title: 'Consoleri',
+    title: APP_NAME,
+    icon: appIconPath(),
     backgroundColor: '#0f1117',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -45,6 +47,9 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.consoleri.desktop')
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon(appIconPath())
+  }
   getDatabase()
 
   app.on('browser-window-created', (_, window) => {

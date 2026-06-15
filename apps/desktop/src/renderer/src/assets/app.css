@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'react-mosaic-component/react-mosaic-component.css';
 
 html,
 body,
@@ -19,24 +20,101 @@ body,
   left: 0;
 }
 
-.consoleri-mosaic .mosaic-window-toolbar {
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-toolbar,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-toolbar {
   background: #161b22;
   border-bottom: 1px solid #30363d;
+  box-shadow: none;
+  height: auto;
+  min-height: 34px;
+  padding: 0 4px;
 }
 
-.consoleri-mosaic .mosaic-window-title {
-  color: #c9d1d9;
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-toolbar.draggable:hover,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-toolbar.draggable:hover {
+  background: #1c2128;
+}
+
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-title,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-title {
+  color: #e6edf3;
   font-size: 12px;
+  font-weight: 500;
 }
 
-.consoleri-mosaic .mosaic-split:hover .mosaic-split-line {
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-toolbar.draggable:hover .mosaic-window-title,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-toolbar.draggable:hover .mosaic-window-title {
+  color: #ffffff;
+}
+
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-controls .bp5-button,
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-controls .bp5-button:before,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-controls .bp5-button,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-controls .bp5-button:before {
+  color: #8b949e;
+}
+
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-controls .bp5-button:hover,
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-controls .bp5-button:hover:before,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-controls .bp5-button:hover,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-controls .bp5-button:hover:before {
+  color: #e6edf3;
+}
+
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-controls .separator,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-controls .separator {
+  border-left-color: #30363d;
+}
+
+.consoleri-mosaic.mosaic .mosaic-split:hover .mosaic-split-line {
   background: #58a6ff;
 }
 
-.consoleri-mosaic .mosaic-tile {
+.consoleri-mosaic.mosaic .mosaic-tile {
   margin: 2px;
 }
 
-.consoleri-mosaic .mosaic-window-body {
+.consoleri-mosaic.mosaic .mosaic-window .mosaic-window-body,
+.consoleri-mosaic.mosaic .mosaic-preview .mosaic-window-body {
   background: #0d1117;
+}
+
+.consoleri-mosaic .mosaic-window-controls {
+  gap: 2px;
+  padding-right: 2px;
+}
+
+.consoleri-mosaic .mosaic-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #8b949e;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.consoleri-mosaic .mosaic-toolbar-btn:hover {
+  background: #21262d;
+  color: #e6edf3;
+}
+
+.consoleri-mosaic .mosaic-toolbar-btn-danger:hover {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.consoleri-mosaic .mosaic-toolbar-btn-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
 }

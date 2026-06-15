@@ -1,6 +1,8 @@
 export type OsType = 'windows' | 'linux' | 'macos' | 'unknown'
 export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
+export type { HostLogVerbosity } from './logging/verbosity'
+import type { HostLogVerbosity } from './logging/verbosity'
 
 export interface Host {
   id: string
@@ -12,13 +14,14 @@ export interface Host {
   groupId: string | null
   notes: string
   defaultProfileId: string | null
+  uxProfileId: string | null
+  logVerbosity: HostLogVerbosity
   createdAt: string
   updatedAt: string
 }
 
 export interface ConnectionProfile {
   id: string
-  hostId: string | null
   name: string
   protocol: Protocol
   shell: string | null
@@ -44,6 +47,7 @@ export interface MosaicSplitNode<T extends string = string> {
   type: 'split'
   direction: 'row' | 'column'
   children: MosaicNode<T>[]
+  splitPercentages?: number[]
 }
 
 export interface MosaicTabsNode<T extends string = string> {

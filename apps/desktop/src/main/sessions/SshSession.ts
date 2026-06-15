@@ -1,41 +1,48 @@
 import { Client, type ConnectConfig } from 'ssh2'
-import type { Host } from '../../shared/types'
-import { credentialVault } from '../hosts/CredentialVault'
-import { hostRepository } from '../hosts/HostRepository'
+import { defaultPortForProtocol, sshDebugEnabled } from '@consoleri/core'
+import type { ConnectionProfile, Host } from '../../shared/types'
+import type { ResolvedCredentials } from '../services/CredentialResolver'
 import { BaseTransport } from './Transport'
+import type { ConnectionLog } from './ConnectionLog'
 
 export interface SshConnectOptions {
   host: Host
-  username: string
-  password?: string
-  privateKey?: string
-  shell?: string
-  jumpHostId?: string | null
+  profile: ConnectionProfile
+  credentials: ResolvedCredentials
+  jumpHost?: Host | null
+  jumpCredentials?: ResolvedCredentials | null
   cols: number
   rows: number
+  log: ConnectionLog
+  sessionId: string
 }
 
-async function buildConnectConfig(
+interface ConnectConfigOptions {
+  portOverride?: number
+  log: ConnectionLog
+  sessionId: string
+  host: Host
+}
+
+function toConnectConfig(
   host: Host,
-  username: string,
-  credentialRef: string | null
-): Promise<ConnectConfig> {
+  credentials: ResolvedCredentials,
+  options: ConnectConfigOptions
+): ConnectConfig {
   const config: ConnectConfig = {
     host: host.hostname,
-    port: host.port || 22,
-    username,
+    port: options.portOverride ?? (host.port || defaultPortForProtocol('ssh')),
+    username: credentials.username || 'root',
+    password: credentials.password,
+    privateKey: credentials.privateKey,
+    passphrase: credentials.passphrase,
     readyTimeout: 20000,
     keepaliveInterval: 10000
   }
 
-  if (credentialRef) {
-    const secret = await credentialVault.retrieve(credentialRef)
-    if (secret) {
-      if (credentialRef.includes(':key')) {
-        config.privateKey = secret
-      } else {
-        config.password = secret
-      }
+  if (sshDebugEnabled(host.logVerbosity)) {
+    config.debug = (message) => {
+      options.log.append(options.sessionId, 'debug', message, { source: 'ssh2' })
     }
   }
 
@@ -44,12 +51,16 @@ async function buildConnectConfig(
 
 function connectWithJump(
   bastionConfig: ConnectConfig,
-  targetConfig: ConnectConfig
+  targetConfig: ConnectConfig,
+  log: ConnectionLog,
+  sessionId: string
 ): Promise<Client> {
   return new Promise((resolve, reject) => {
     const bastion = new Client()
+    log.append(sessionId, 'info', `Connecting to jump host ${bastionConfig.host}:${bastionConfig.port}`)
     bastion
       .on('ready', () => {
+        log.append(sessionId, 'info', 'Jump host ready, forwarding to target')
         bastion.forwardOut(
           '127.0.0.1',
           0,
@@ -58,24 +69,29 @@ function connectWithJump(
           (err, stream) => {
             if (err) {
               bastion.end()
+              log.append(sessionId, 'error', `Jump forward failed: ${err.message}`)
               reject(err)
               return
             }
             const target = new Client()
             target
-              .on('ready', () => resolve(target))
+              .on('ready', () => {
+                log.append(sessionId, 'info', 'Target SSH session ready via jump host')
+                resolve(target)
+              })
               .on('error', (e) => {
                 bastion.end()
+                log.append(sessionId, 'error', `Target connection failed: ${e.message}`)
                 reject(e)
               })
-            target.connect({
-              ...targetConfig,
-              sock: stream
-            })
+            target.connect({ ...targetConfig, sock: stream })
           }
         )
       })
-      .on('error', reject)
+      .on('error', (err) => {
+        log.append(sessionId, 'error', `Jump host error: ${err.message}`)
+        reject(err)
+      })
       .connect(bastionConfig)
   })
 }
@@ -92,58 +108,48 @@ export class SshSession extends BaseTransport {
   }
 
   private async connect(options: SshConnectOptions): Promise<void> {
-    const { host, username, shell, jumpHostId, cols, rows } = options
-    let password = options.password
-    let privateKey = options.privateKey
+    const { host, profile, credentials, jumpHost, jumpCredentials, cols, rows, log, sessionId } =
+      options
 
-    const profile = hostRepository.listProfiles(host.id).find((p) => p.protocol === 'ssh')
-    const credRef = profile?.credentialRef
-    if (credRef && !password && !privateKey) {
-      const secret = await credentialVault.retrieve(credRef)
-      if (secret) {
-        if (credRef.includes(':key')) privateKey = secret
-        else password = secret
+    log.append(sessionId, 'info', `Connecting SSH to ${host.hostname}:${host.port || 22}`)
+    log.append(sessionId, 'debug', `Profile: ${profile.name}, user: ${credentials.username}`)
+
+    const connectOptions = { log, sessionId, host }
+    const targetConfig = toConnectConfig(host, credentials, connectOptions)
+
+    if (profile.jumpHostId && jumpHost) {
+      if (!jumpCredentials) {
+        throw new Error('Jump host credentials could not be resolved')
       }
-    }
-
-    const targetConfig: ConnectConfig = {
-      host: host.hostname,
-      port: host.port || 22,
-      username,
-      password,
-      privateKey,
-      readyTimeout: 20000,
-      keepaliveInterval: 10000
-    }
-
-    if (jumpHostId) {
-      const jumpHost = hostRepository.getHost(jumpHostId)
-      if (!jumpHost) throw new Error(`Jump host not found: ${jumpHostId}`)
-      const jumpProfile = hostRepository.listProfiles(jumpHostId)[0]
-      const bastionConfig = await buildConnectConfig(
-        jumpHost,
-        jumpProfile?.username ?? username,
-        jumpProfile?.credentialRef ?? null
-      )
-      this.client = await connectWithJump(bastionConfig, targetConfig)
+      const bastionConfig = toConnectConfig(jumpHost, jumpCredentials, connectOptions)
+      this.client = await connectWithJump(bastionConfig, targetConfig, log, sessionId)
     } else {
       this.client = await new Promise<Client>((resolve, reject) => {
         const c = new Client()
-        c.on('ready', () => resolve(c))
-        c.on('error', reject)
+        c.on('ready', () => {
+          log.append(sessionId, 'info', 'SSH handshake complete')
+          resolve(c)
+        })
+        c.on('error', (err) => {
+          log.append(sessionId, 'error', `SSH error: ${err.message}`)
+          reject(err)
+        })
         c.connect(targetConfig)
       })
     }
 
-    const shellCmd = shell || undefined
+    const shellCmd = profile.shell || undefined
+    log.append(sessionId, 'info', shellCmd ? `Opening shell: ${shellCmd}` : 'Opening interactive shell')
+
     const stream = await new Promise<import('ssh2').ClientChannel>((resolve, reject) => {
+      const pty = { rows, cols, term: 'xterm-256color' }
       if (shellCmd) {
-        this.client!.exec(shellCmd, { pty: { rows, cols, term: 'xterm-256color' } }, (err, s) => {
+        this.client!.exec(shellCmd, { pty }, (err, s) => {
           if (err) reject(err)
           else resolve(s)
         })
       } else {
-        this.client!.shell({ rows, cols, term: 'xterm-256color' }, (err, s) => {
+        this.client!.shell(pty, (err, s) => {
           if (err) reject(err)
           else resolve(s)
         })
@@ -151,6 +157,7 @@ export class SshSession extends BaseTransport {
     })
 
     this.stream = stream
+    log.append(sessionId, 'info', 'Shell channel open')
     stream.on('data', (data: Buffer) => this.emit('data', data.toString('utf8')))
     stream.on('close', () => this.emit('exit', 0))
     stream.stderr?.on('data', (data: Buffer) => this.emit('data', data.toString('utf8')))

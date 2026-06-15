@@ -6,7 +6,9 @@
     "types": ["electron-vite/node"],
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["src/shared/*"],
+      "@consoleri/core": ["../../packages/core/src/index.ts"],
+      "@consoleri/core/*": ["../../packages/core/src/*"]
     }
   }
 }

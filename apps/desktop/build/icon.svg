@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#0f1117"/>
+  <circle cx="256" cy="256" r="220" fill="#161b22" stroke="#30363d" stroke-width="4"/>
+  <!-- Morion helmet silhouette -->
+  <path
+    d="M256 108c-72 0-128 36-128 88v24c0 8 6 14 14 14h8v72c0 36 28 64 64 64h84c36 0 64-28 64-64v-72h8c8 0 14-6 14-14v-24c0-52-56-88-128-88z"
+    fill="#d29922"
+  />
+  <!-- Crest -->
+  <path
+    d="M256 88c-18 0-32 14-32 32v12c0 6 5 11 11 11h42c6 0 11-5 11-11V120c0-18-14-32-32-32z"
+    fill="#f0c14b"
+  />
+  <!-- Brim highlights -->
+  <path
+    d="M142 196c-8 28-6 56 8 80 12 20 32 34 56 40-20-32-28-72-24-120h-40z"
+    fill="#b8860b"
+  />
+  <path
+    d="M370 196c8 28 6 56-8 80-12 20-32 34-56 40 20-32 28-72 24-120h40z"
+    fill="#b8860b"
+  />
+  <!-- Face opening -->
+  <ellipse cx="256" cy="248" rx="52" ry="40" fill="#0f1117"/>
+  <!-- Shine -->
+  <path
+    d="M220 148c-12 8-20 22-22 38 16-6 34-8 58-8s42 2 58 8c-2-16-10-30-22-38-16-10-36-16-58-16s-42 6-58 16z"
+    fill="#f0c14b"
+    opacity="0.45"
+  />
+</svg>

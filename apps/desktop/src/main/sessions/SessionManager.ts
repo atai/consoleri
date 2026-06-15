@@ -1,19 +1,15 @@
 import { nanoid } from 'nanoid'
 import type { BrowserWindow } from 'electron'
-import type {
-  OpenSessionRequest,
-  Protocol,
-  SessionInfo,
-  SessionStatus
-} from '../../shared/types'
+import { isTerminalProtocol } from '@consoleri/core'
+import type { OpenSessionRequest, SessionInfo, SessionStatus } from '../../shared/types'
 import { IPC_CHANNELS } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import { credentialVault } from '../hosts/CredentialVault'
-import { PtySession } from './PtySession'
-import { RdpProxy, RdpSession } from './RdpProxy'
-import { SshSession } from './SshSession'
+import { connectionLog } from './ConnectionLog'
+import { sessionFactory } from './SessionFactory'
 import type { ITransport } from './Transport'
-import { VncProxy, VncSession } from './VncProxy'
+import { RdpProxy } from './RdpProxy'
+import { VncProxy } from './VncProxy'
 
 interface ManagedSession {
   info: SessionInfo
@@ -21,11 +17,13 @@ interface ManagedSession {
   rdpProxy?: RdpProxy
   vncProxy?: VncProxy
   reconnectMeta?: OpenSessionRequest & { cols: number; rows: number }
+  connecting?: boolean
 }
 
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>()
   private window: BrowserWindow | null = null
+  private logWindow: BrowserWindow | null = null
 
   setWindow(win: BrowserWindow): void {
     this.window = win
@@ -39,6 +37,14 @@ export class SessionManager {
     if (this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(channel, payload)
     }
+    if (this.logWindow && !this.logWindow.isDestroyed()) {
+      this.logWindow.webContents.send(channel, payload)
+    }
+  }
+
+  private appendLog(sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
+    const entry = connectionLog.append(sessionId, level, message)
+    if (entry) this.send(IPC_CHANNELS.sessionLog, entry)
   }
 
   private updateStatus(id: string, status: SessionStatus, error?: string): void {
@@ -46,6 +52,8 @@ export class SessionManager {
     if (!session) return
     session.info.status = status
     if (error) session.info.error = error
+    else delete session.info.error
+    session.connecting = status === 'connecting'
     this.send(IPC_CHANNELS.sessionStatus, { id, status, error })
   }
 
@@ -55,119 +63,122 @@ export class SessionManager {
     })
     transport.on('exit', (code: number) => {
       this.updateStatus(id, 'disconnected')
+      this.appendLog(id, 'info', `Session exited (code ${code})`)
       this.send(IPC_CHANNELS.sessionExit, { id, code })
     })
     transport.on('error', (err: Error) => {
+      this.appendLog(id, 'error', err.message)
       this.updateStatus(id, 'error', err.message)
     })
   }
 
-  async open(request: OpenSessionRequest, cols = 80, rows = 24): Promise<SessionInfo> {
+  open(request: OpenSessionRequest, cols = 80, rows = 24): SessionInfo {
     const id = nanoid()
-    let protocol: Protocol = request.protocol ?? 'local_pty'
-    let title = request.title ?? 'Terminal'
-    let transport: ITransport | null = null
-    let proxyUrl: string | undefined
-    let rdpProxy: RdpProxy | undefined
-    let vncProxy: VncProxy | undefined
-
     const info: SessionInfo = {
       id,
-      protocol,
-      title,
+      protocol: request.protocol ?? 'local_pty',
+      title: request.title ?? 'Terminal',
       status: 'connecting',
       hostId: request.hostId ?? null,
       profileId: request.profileId ?? null
     }
-    this.sessions.set(id, { info, transport: null, reconnectMeta: { ...request, cols, rows } })
+
+    this.sessions.set(id, {
+      info,
+      transport: null,
+      reconnectMeta: { ...request, cols, rows },
+      connecting: true
+    })
+
+    if (request.hostId) {
+      const host = hostRepository.getHost(request.hostId)
+      if (host) connectionLog.setSessionVerbosity(id, host.logVerbosity)
+    } else {
+      connectionLog.setSessionVerbosity(id, 'info')
+    }
+
+    this.appendLog(id, 'info', 'Session requested')
+    void this.connectInBackground(id, request, cols, rows)
+    return info
+  }
+
+  private async connectInBackground(
+    id: string,
+    request: OpenSessionRequest,
+    cols: number,
+    rows: number
+  ): Promise<void> {
+    const managed = this.sessions.get(id)
+    if (!managed) return
 
     try {
-      if (request.profileId || request.hostId) {
-        const profile = request.profileId
-          ? hostRepository.getProfile(request.profileId)
-          : request.hostId
-            ? hostRepository.listProfiles(request.hostId).find((p) => p.id === request.profileId) ??
-              hostRepository.listProfiles(request.hostId)[0]
-            : null
+      const result = await sessionFactory.createTransport(id, request, cols, rows)
+      if (!this.sessions.has(id)) return
 
-        const host = request.hostId
-          ? hostRepository.getHost(request.hostId)
-          : profile?.hostId
-            ? hostRepository.getHost(profile.hostId)
-            : null
+      managed.transport = result.transport
+      managed.rdpProxy = result.rdpProxy
+      managed.vncProxy = result.vncProxy
+      managed.info.protocol = result.protocol
+      managed.info.title = result.title
+      managed.info.proxyUrl = result.proxyUrl
+      managed.info.status = 'connected'
+      managed.connecting = false
 
-        if (profile) protocol = profile.protocol
-        if (host) title = `${host.name} (${protocol})`
+      this.appendLog(id, 'info', 'Session connected')
 
-        if (protocol === 'ssh' && host) {
-          transport = await SshSession.create({
-            host,
-            username: profile?.username ?? 'root',
-            shell: profile?.shell ?? undefined,
-            jumpHostId: profile?.jumpHostId,
-            cols,
-            rows
-          })
-        } else if (protocol === 'rdp' && host) {
-          rdpProxy = new RdpProxy()
-          const rdpPort = (profile?.extra?.rdpPort as number) ?? 3389
-          const proxy = await rdpProxy.start(host.hostname, rdpPort)
-          proxyUrl = proxy.proxyUrl
-          transport = new RdpSession(proxy.proxyUrl, rdpProxy)
-        } else if (protocol === 'vnc' && host) {
-          vncProxy = new VncProxy()
-          const vncPort = (profile?.extra?.vncPort as number) ?? 5900
-          const proxy = await vncProxy.start(host.hostname, vncPort)
-          proxyUrl = proxy.proxyUrl
-          transport = new VncSession(proxy.proxyUrl, vncProxy)
-        } else if (protocol === 'wsl') {
-          transport = new PtySession('wsl', cols, rows, request.wslDistro, profile?.shell ?? '/bin/bash')
-        } else if (protocol === 'local_pty') {
-          const shell = request.localShell ?? 'powershell'
-          transport = new PtySession(shell, cols, rows)
-        }
-      } else {
-        const shell = request.localShell ?? (process.platform === 'win32' ? 'powershell' : 'bash')
-        protocol = request.localShell === 'wsl' ? 'wsl' : 'local_pty'
-        title = shell === 'wsl' ? `WSL${request.wslDistro ? ` (${request.wslDistro})` : ''}` : shell
-        transport = new PtySession(shell, cols, rows, request.wslDistro)
+      if (isTerminalProtocol(result.protocol)) {
+        this.attachTransport(id, result.transport)
       }
-
-      if (!transport) throw new Error('Failed to create session transport')
-
-      info.protocol = protocol
-      info.title = title
-      info.proxyUrl = proxyUrl
-      info.status = 'connected'
-
-      const managed = this.sessions.get(id)!
-      managed.transport = transport
-      managed.rdpProxy = rdpProxy
-      managed.vncProxy = vncProxy
-      managed.info = info
-
-      if (protocol === 'ssh' || protocol === 'local_pty' || protocol === 'wsl') {
-        this.attachTransport(id, transport)
-      } else {
-        this.updateStatus(id, 'connected')
-      }
-
-      return info
+      this.updateStatus(id, 'connected')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      this.appendLog(id, 'error', message)
       this.updateStatus(id, 'error', message)
-      info.status = 'error'
-      info.error = message
-      return info
     }
   }
 
   async reconnect(sessionId: string): Promise<SessionInfo | null> {
     const existing = this.sessions.get(sessionId)
     if (!existing?.reconnectMeta) return null
-    this.close(sessionId)
-    const newSession = await this.open(existing.reconnectMeta, existing.reconnectMeta.cols, existing.reconnectMeta.rows)
-    return newSession
+
+    const { cols, rows, ...request } = existing.reconnectMeta
+    existing.transport?.disconnect()
+    existing.rdpProxy?.stop()
+    existing.vncProxy?.stop()
+    existing.transport = null
+    existing.rdpProxy = undefined
+    existing.vncProxy = undefined
+
+    connectionLog.clear(sessionId)
+    if (request.hostId) {
+      const host = hostRepository.getHost(request.hostId)
+      if (host) connectionLog.setSessionVerbosity(sessionId, host.logVerbosity)
+    }
+    this.updateStatus(sessionId, 'connecting')
+    this.appendLog(sessionId, 'info', 'Reconnecting…')
+
+    try {
+      const result = await sessionFactory.createTransport(sessionId, request, cols, rows)
+      existing.transport = result.transport
+      existing.rdpProxy = result.rdpProxy
+      existing.vncProxy = result.vncProxy
+      existing.info.protocol = result.protocol
+      existing.info.title = result.title
+      existing.info.proxyUrl = result.proxyUrl
+      existing.info.status = 'connected'
+      existing.connecting = false
+
+      if (isTerminalProtocol(result.protocol)) {
+        this.attachTransport(sessionId, result.transport)
+      }
+      this.updateStatus(sessionId, 'connected')
+      return existing.info
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.appendLog(sessionId, 'error', message)
+      this.updateStatus(sessionId, 'error', message)
+      return existing.info
+    }
   }
 
   write(sessionId: string, data: string): void {
@@ -189,6 +200,7 @@ export class SessionManager {
     session.transport?.disconnect()
     session.rdpProxy?.stop()
     session.vncProxy?.stop()
+    connectionLog.removeSession(sessionId)
     this.sessions.delete(sessionId)
   }
 
@@ -198,14 +210,29 @@ export class SessionManager {
     }
   }
 
+  getLogEntries(sessionId: string) {
+    return connectionLog.getEntries(sessionId)
+  }
+
+  appendOperationLog(
+    logId: string,
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    meta?: Record<string, unknown>
+  ): void {
+    const entry = connectionLog.append(logId, level, message, meta)
+    if (entry) this.send(IPC_CHANNELS.sessionLog, entry)
+  }
+
+  setLogWindow(win: BrowserWindow | null): void {
+    this.logWindow = win
+  }
+
   async getCredentialsForRdp(profileId: string): Promise<{ username: string; password: string } | null> {
     const profile = hostRepository.getProfile(profileId)
     if (!profile) return null
     const password = profile.credentialRef ? await credentialVault.retrieve(profile.credentialRef) : null
-    return {
-      username: profile.username ?? '',
-      password: password ?? ''
-    }
+    return { username: profile.username ?? '', password: password ?? '' }
   }
 
   async getCredentialsForVnc(profileId: string): Promise<string | null> {

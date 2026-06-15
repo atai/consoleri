@@ -1,4 +1,5 @@
 import type { ConnectionProfile, Host, OsType } from '../types'
+import { normalizeHostLogVerbosity } from '../logging/verbosity'
 
 export function rowToHost(row: Record<string, unknown>): Host {
   return {
@@ -11,6 +12,8 @@ export function rowToHost(row: Record<string, unknown>): Host {
     groupId: (row.group_id as string) || null,
     notes: (row.notes as string) || '',
     defaultProfileId: (row.default_profile_id as string) || null,
+    uxProfileId: (row.ux_profile_id as string) || null,
+    logVerbosity: normalizeHostLogVerbosity(row.log_verbosity),
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string
   }
@@ -19,7 +22,6 @@ export function rowToHost(row: Record<string, unknown>): Host {
 export function rowToProfile(row: Record<string, unknown>): ConnectionProfile {
   return {
     id: row.id as string,
-    hostId: (row.host_id as string) || null,
     name: row.name as string,
     protocol: row.protocol as ConnectionProfile['protocol'],
     shell: (row.shell as string) || null,

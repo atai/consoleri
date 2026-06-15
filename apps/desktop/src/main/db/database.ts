@@ -3,6 +3,11 @@ import { app } from 'electron'
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { nanoid } from 'nanoid'
+import {
+  BUILTIN_UX_PROFILE_ID,
+  createBuiltinUxProfile,
+  DEFAULT_CHROME_APPEARANCE
+} from '@consoleri/core'
 
 let db: DatabaseSync | null = null
 
@@ -24,6 +29,7 @@ CREATE TABLE IF NOT EXISTS hosts (
   group_id TEXT,
   notes TEXT NOT NULL DEFAULT '',
   default_profile_id TEXT,
+  log_verbosity TEXT NOT NULL DEFAULT 'info',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (group_id) REFERENCES host_groups(id) ON DELETE SET NULL
@@ -77,9 +83,27 @@ CREATE TABLE IF NOT EXISTS session_snapshots (
 CREATE INDEX IF NOT EXISTS idx_hosts_group ON hosts(group_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_host ON connection_profiles(host_id);
 
+CREATE TABLE IF NOT EXISTS host_profile_links (
+  host_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  PRIMARY KEY (host_id, profile_id),
+  FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE,
+  FOREIGN KEY (profile_id) REFERENCES connection_profiles(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_hpl_profile ON host_profile_links(profile_id);
+
 CREATE TABLE IF NOT EXISTS vault_secrets (
   ref TEXT PRIMARY KEY,
   encrypted_blob TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS custom_ssh_keys (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  private_key_path TEXT NOT NULL UNIQUE,
+  public_key_path TEXT,
+  created_at TEXT NOT NULL
 );
 `
 
@@ -96,6 +120,9 @@ export function getDatabase(): DatabaseSync {
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA foreign_keys = ON')
   db.exec(SCHEMA)
+  migrateHostProfileLinks(db)
+  migrateHostLogVerbosity(db)
+  migrateUxProfiles(db)
 
   const workspaceCount = db.prepare('SELECT COUNT(*) as c FROM workspaces').get() as { c: number }
   if (workspaceCount.c === 0) {
@@ -112,4 +139,86 @@ export function closeDatabase(): void {
     db.close()
     db = null
   }
+}
+
+function migrateHostProfileLinks(database: DatabaseSync): void {
+  database.exec(`
+    INSERT OR IGNORE INTO host_profile_links (host_id, profile_id)
+    SELECT host_id, id FROM connection_profiles WHERE host_id IS NOT NULL
+  `)
+}
+
+function migrateHostLogVerbosity(database: DatabaseSync): void {
+  const columns = database.prepare('PRAGMA table_info(hosts)').all() as Array<{ name: string }>
+  if (!columns.some((column) => column.name === 'log_verbosity')) {
+    database.exec(`ALTER TABLE hosts ADD COLUMN log_verbosity TEXT NOT NULL DEFAULT 'info'`)
+  }
+}
+
+function migrateUxProfiles(database: DatabaseSync): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS ux_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      settings_json TEXT NOT NULL,
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS app_preferences (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `)
+
+  const hostColumns = database.prepare('PRAGMA table_info(hosts)').all() as Array<{ name: string }>
+  if (!hostColumns.some((column) => column.name === 'ux_profile_id')) {
+    database.exec(`ALTER TABLE hosts ADD COLUMN ux_profile_id TEXT`)
+  }
+
+  const count = database.prepare('SELECT COUNT(*) as c FROM ux_profiles').get() as { c: number }
+  if (count.c === 0) {
+    const builtin = createBuiltinUxProfile()
+    database
+      .prepare(
+        `INSERT INTO ux_profiles (id, name, settings_json, is_builtin, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`
+      )
+      .run(
+        builtin.id,
+        builtin.name,
+        JSON.stringify({ terminal: builtin.terminal, chrome: builtin.chrome }),
+        builtin.createdAt,
+        builtin.updatedAt
+      )
+    database
+      .prepare(
+        `INSERT INTO app_preferences (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      .run('active_ux_profile_id', BUILTIN_UX_PROFILE_ID)
+  }
+}
+
+export function migrateSidebarWidthFromRenderer(width: number): void {
+  const clamped = Math.min(480, Math.max(200, width))
+  if (clamped === DEFAULT_CHROME_APPEARANCE.sidebarWidth) return
+  const db = getDatabase()
+  const row = db.prepare('SELECT settings_json FROM ux_profiles WHERE id = ?').get(BUILTIN_UX_PROFILE_ID) as
+    | { settings_json: string }
+    | undefined
+  if (!row) return
+  const settings = JSON.parse(row.settings_json) as {
+    terminal?: unknown
+    chrome?: { sidebarWidth?: number }
+  }
+  if (settings.chrome?.sidebarWidth === clamped) return
+  settings.chrome = { ...DEFAULT_CHROME_APPEARANCE, ...settings.chrome, sidebarWidth: clamped }
+  const now = new Date().toISOString()
+  db.prepare(`UPDATE ux_profiles SET settings_json = ?, updated_at = ? WHERE id = ?`).run(
+    JSON.stringify(settings),
+    now,
+    BUILTIN_UX_PROFILE_ID
+  )
 }

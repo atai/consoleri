@@ -3,6 +3,8 @@ export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance } from '@consoleri/core'
+import type { HostLogVerbosity } from '@consoleri/core'
 
 export interface LogEntry {
   id: string
@@ -30,13 +32,14 @@ export interface Host {
   groupId: string | null
   notes: string
   defaultProfileId: string | null
+  uxProfileId: string | null
+  logVerbosity: HostLogVerbosity
   createdAt: string
   updatedAt: string
 }
 
 export interface ConnectionProfile {
   id: string
-  hostId: string | null
   name: string
   protocol: Protocol
   shell: string | null
@@ -109,10 +112,11 @@ export interface HostInput {
   groupId?: string | null
   notes?: string
   defaultProfileId?: string | null
+  uxProfileId?: string | null
+  logVerbosity?: HostLogVerbosity
 }
 
 export interface ProfileInput {
-  hostId?: string | null
   name: string
   protocol: Protocol
   shell?: string | null
@@ -123,6 +127,8 @@ export interface ProfileInput {
   extra?: Record<string, unknown>
   password?: string
   privateKey?: string
+  cloneFromProfileId?: string
+  linkHostId?: string
 }
 
 export interface WslDistro {
@@ -131,11 +137,53 @@ export interface WslDistro {
   version: number
 }
 
+export type SshKeySource = 'ssh_dir' | 'custom'
+
+export interface SshKeyInfo {
+  id: string
+  label: string
+  privateKeyPath: string
+  publicKeyPath: string | null
+  fingerprint: string | null
+  keyType: string | null
+  encrypted: boolean
+  source: SshKeySource
+  exists: boolean
+}
+
+export interface AssignableHost {
+  hostId: string
+  hostName: string
+  hostname: string
+  profiles: Array<{
+    profileId: string
+    profileName: string
+    username: string | null
+    credentialRef: string | null
+  }>
+}
+
+export interface DeployKeyRequest {
+  hostId: string
+  profileId?: string
+  keyPath: string
+  deployPassword?: string
+  logId?: string
+  openLog?: boolean
+}
+
+export interface DeployKeyResult {
+  success: boolean
+  message: string
+  logId?: string
+}
+
 export interface PaneBinding {
   paneId: string
-  sessionId: string
+  sessionId: string | null
   protocol: Protocol
   title: string
+  connectRequest: OpenSessionRequest
 }
 
 export interface WorkspaceState {
@@ -156,6 +204,10 @@ export const IPC_CHANNELS = {
   profilesCreate: 'hosts:profiles:create',
   profilesUpdate: 'hosts:profiles:update',
   profilesDelete: 'hosts:profiles:delete',
+  profilesLink: 'hosts:profiles:link',
+  profilesUnlink: 'hosts:profiles:unlink',
+  profilesListHosts: 'hosts:profiles:list-hosts',
+  profilesDuplicate: 'hosts:profiles:duplicate',
   credentialsStore: 'credentials:store',
   credentialsDelete: 'credentials:delete',
   sessionsOpen: 'sessions:open',
@@ -173,5 +225,30 @@ export const IPC_CHANNELS = {
   workspaceGetActive: 'workspace:get-active',
   sessionData: 'session:data',
   sessionExit: 'session:exit',
-  sessionStatus: 'session:status'
+  sessionStatus: 'session:status',
+  sessionLog: 'session:log',
+  sessionsLogGet: 'sessions:log:get',
+  sessionsLogOpenWindow: 'sessions:log:openWindow',
+  keysList: 'keys:list',
+  keysAdd: 'keys:add',
+  keysRemove: 'keys:remove',
+  keysPickFile: 'keys:pickFile',
+  keysAssign: 'keys:assign',
+  keysDeploy: 'keys:deploy',
+  keysStorePassphrase: 'keys:storePassphrase',
+  keysAssignableHosts: 'keys:assignableHosts',
+  uxProfilesList: 'uxProfiles:list',
+  uxProfilesGet: 'uxProfiles:get',
+  uxProfilesCreate: 'uxProfiles:create',
+  uxProfilesUpdate: 'uxProfiles:update',
+  uxProfilesDelete: 'uxProfiles:delete',
+  uxProfilesDuplicate: 'uxProfiles:duplicate',
+  uxProfilesGetActive: 'uxProfiles:get-active',
+  uxProfilesSetActive: 'uxProfiles:set-active',
+  uxProfilesListHosts: 'uxProfiles:list-hosts',
+  uxProfilesLinkHost: 'uxProfiles:link-host',
+  uxProfilesUnlinkHost: 'uxProfiles:unlink-host',
+  uxProfilesMigrateSidebarWidth: 'uxProfiles:migrate-sidebar-width',
+  clipboardReadText: 'clipboard:readText',
+  clipboardWriteText: 'clipboard:writeText'
 } as const

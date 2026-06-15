@@ -5,6 +5,7 @@ describe('authTypeFromCredentialRef', () => {
   it('detects key vs password refs', () => {
     expect(authTypeFromCredentialRef('profile:1:key')).toBe('privateKey')
     expect(authTypeFromCredentialRef('profile:1:password')).toBe('password')
+    expect(authTypeFromCredentialRef('keyfile:/home/u/.ssh/id_rsa')).toBe('privateKey')
     expect(authTypeFromCredentialRef(null)).toBe('none')
   })
 })

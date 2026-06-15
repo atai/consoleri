@@ -1,6 +1,6 @@
 import * as pty from 'node-pty'
 import { BaseTransport } from './Transport'
-import { resolveLocalShell } from './shellUtils'
+import { resolveLocalShellSpawn } from './shellUtils'
 
 export class PtySession extends BaseTransport {
   readonly protocol = 'local_pty'
@@ -14,7 +14,7 @@ export class PtySession extends BaseTransport {
     wslShell?: string
   ) {
     super()
-    const { file, args, cwd } = resolveLocalShell(shell, wslDistro, wslShell)
+    const { file, args, cwd } = resolveLocalShellSpawn(shell, wslDistro, wslShell)
     const env = { ...process.env } as Record<string, string>
     if (process.platform === 'win32' && !env.TERM) {
       env.TERM = 'xterm-256color'

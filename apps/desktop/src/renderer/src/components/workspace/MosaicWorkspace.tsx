@@ -3,35 +3,97 @@ import {
   Mosaic,
   MosaicWindow,
   MosaicNode,
-  MosaicPath,
-  MosaicSplitNode,
-  createDefaultToolbarButton
+  MosaicPath
 } from 'react-mosaic-component'
-import 'react-mosaic-component/react-mosaic-component.css'
-import { nanoid } from 'nanoid'
-import type { PaneBinding, Protocol, SessionInfo, WorkspaceState } from '@shared/types'
-import { useAppStore } from '../../stores/appStore'
+import { removeFromLayout, isTerminalProtocol } from '@consoleri/core'
+import type { MosaicNode as CoreMosaicNode } from '@consoleri/core'
+import type { PaneBinding, SessionInfo } from '@shared/types'
+import { useAppStore, flushWorkspacePersist } from '../../stores/appStore'
 import { TerminalPane } from '../terminal/TerminalPane'
 import { RdpPane } from '../rdp/RdpPane'
 import { VncPane } from '../vnc/VncPane'
 import { releaseTerminal, serializeAll } from '../../terminal/TerminalPool'
-
-function isTerminalProtocol(p: Protocol): boolean {
-  return p === 'ssh' || p === 'local_pty' || p === 'wsl'
-}
+import { connectPane, splitPaneInWorkspace } from '../../session/openSession'
+import {
+  closeToolbarButton,
+  connectToolbarButton,
+  logToolbarButton,
+  splitSideBySideButton,
+  splitStackedButton
+} from './MosaicToolbarButton'
 
 interface SessionPaneProps {
   session: SessionInfo | undefined
+  binding: PaneBinding | undefined
   onReconnect: (sessionId: string) => void
+  onConnect: () => void
 }
 
-function SessionPaneContent({ session, onReconnect }: SessionPaneProps): React.JSX.Element {
+function DisconnectedPane({
+  binding,
+  onConnect
+}: {
+  binding: PaneBinding | undefined
+  onConnect: () => void
+}): React.JSX.Element {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-sm text-gray-400">
+      <p className="text-gray-300">{binding?.title ?? 'Not connected'}</p>
+      <button
+        type="button"
+        onClick={onConnect}
+        className="rounded bg-blue-600 px-4 py-1.5 text-xs text-white hover:bg-blue-500"
+      >
+        Connect
+      </button>
+    </div>
+  )
+}
+
+function SessionPaneContent({ session, binding, onReconnect, onConnect }: SessionPaneProps): React.JSX.Element {
   if (!session) {
+    return <DisconnectedPane binding={binding} onConnect={onConnect} />
+  }
+
+  if (session.status === 'connecting') {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-gray-500">
-        Session not found
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-gray-400">
+        <span className="animate-pulse">Connecting…</span>
+        <button
+          type="button"
+          onClick={() => window.consoleri.sessions.openLogWindow(session.id)}
+          className="rounded border border-[#30363d] px-3 py-1 text-xs text-gray-300 hover:bg-[#21262d]"
+        >
+          View log
+        </button>
       </div>
     )
+  }
+
+  if (session.status === 'error') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-sm text-red-400">
+        <p>{session.error ?? 'Connection failed'}</p>
+        <button
+          type="button"
+          onClick={() => window.consoleri.sessions.openLogWindow(session.id)}
+          className="rounded border border-[#30363d] px-3 py-1 text-xs text-gray-300 hover:bg-[#21262d]"
+        >
+          View log
+        </button>
+        <button
+          type="button"
+          onClick={onConnect}
+          className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500"
+        >
+          Connect
+        </button>
+      </div>
+    )
+  }
+
+  if (session.status === 'disconnected') {
+    return <DisconnectedPane binding={binding} onConnect={onConnect} />
   }
 
   if (session.protocol === 'rdp') {
@@ -44,7 +106,8 @@ function SessionPaneContent({ session, onReconnect }: SessionPaneProps): React.J
     return (
       <TerminalPane
         sessionId={session.id}
-        disconnected={session.status === 'disconnected'}
+        hostId={session.hostId}
+        disconnected={false}
         onReconnect={() => onReconnect(session.id)}
       />
     )
@@ -57,34 +120,33 @@ function SessionPaneContent({ session, onReconnect }: SessionPaneProps): React.J
   )
 }
 
+function paneTitle(session: SessionInfo | undefined, binding: PaneBinding | undefined, paneId: string): string {
+  const base = binding?.title ?? session?.title ?? paneId
+  if (!session) return base
+  if (session.status === 'connecting') return `${base} — Connecting…`
+  if (session.status === 'error') return `${base} — Error`
+  return base
+}
+
+function needsConnect(session: SessionInfo | undefined, binding: PaneBinding | undefined): boolean {
+  if (!binding?.connectRequest) return false
+  if (!binding.sessionId || !session) return true
+  return session.status === 'error' || session.status === 'disconnected'
+}
+
 export function MosaicWorkspace(): React.JSX.Element {
-  const { workspace, sessions, setWorkspace } = useAppStore()
+  const { workspace, sessions, persistWorkspace } = useAppStore()
 
   const layout = workspace.layout as MosaicNode<string> | null
 
   const getSession = useCallback(
     (paneId: string) => {
       const binding = workspace.panes.find((p) => p.paneId === paneId)
-      if (!binding) return undefined
+      if (!binding?.sessionId) return undefined
       return sessions.find((s) => s.id === binding.sessionId)
     },
     [workspace.panes, sessions]
   )
-
-  const persistWorkspace = useCallback(
-    (nextLayout: MosaicNode<string> | null, panes: PaneBinding[]) => {
-      const state: WorkspaceState = { layout: nextLayout, panes }
-      setWorkspace(state)
-      window.consoleri.workspace.save(state)
-    },
-    [setWorkspace]
-  )
-
-  useEffect(() => {
-    window.consoleri.workspace.load().then((ws) => {
-      if (ws) setWorkspace(ws)
-    })
-  }, [setWorkspace])
 
   useEffect(() => {
     const saveOnExit = (): void => {
@@ -104,7 +166,7 @@ export function MosaicWorkspace(): React.JSX.Element {
           scrollbackSerialized: data
         })
       }
-      window.consoleri.workspace.save(workspace)
+      flushWorkspacePersist()
     }
     window.addEventListener('beforeunload', saveOnExit)
     return () => window.removeEventListener('beforeunload', saveOnExit)
@@ -119,32 +181,53 @@ export function MosaicWorkspace(): React.JSX.Element {
 
   const closePane = (paneId: string): void => {
     const binding = workspace.panes.find((p) => p.paneId === paneId)
-    if (binding) {
+    if (binding?.sessionId) {
       window.consoleri.sessions.close(binding.sessionId)
       releaseTerminal(binding.sessionId)
       useAppStore.getState().removeSession(binding.sessionId)
     }
     const newPanes = workspace.panes.filter((p) => p.paneId !== paneId)
-    const newLayout = layout ? removeFromLayout(layout, paneId) : null
+    const newLayout = layout
+      ? (removeFromLayout(layout as CoreMosaicNode<string>, paneId) as MosaicNode<string> | null)
+      : null
     persistWorkspace(newLayout, newPanes)
+  }
+
+  const openLog = (sessionId: string): void => {
+    void window.consoleri.sessions.openLogWindow(sessionId)
   }
 
   const renderTile = (paneId: string, path: MosaicPath): React.JSX.Element => {
     const binding = workspace.panes.find((p) => p.paneId === paneId)
     const session = getSession(paneId)
-    const title = binding?.title ?? session?.title ?? paneId
+    const title = paneTitle(session, binding, paneId)
+    const showLog = session?.status === 'connecting' || session?.status === 'error'
+    const splitDisabled = session?.status === 'connecting'
+    const showConnect = needsConnect(session, binding)
+
+    const toolbarControls = [
+      ...(!splitDisabled
+        ? [
+            splitSideBySideButton(() => void splitPaneInWorkspace(paneId, 'row')),
+            splitStackedButton(() => void splitPaneInWorkspace(paneId, 'column'))
+          ]
+        : []),
+      ...(showConnect ? [connectToolbarButton(() => void connectPane(paneId))] : []),
+      ...(showLog && binding?.sessionId
+        ? [logToolbarButton(() => openLog(binding.sessionId!))]
+        : []),
+      closeToolbarButton(() => closePane(paneId))
+    ]
 
     return (
-      <MosaicWindow<string>
-        path={path}
-        title={title}
-        toolbarControls={[
-          createDefaultToolbarButton('Close', 'close-button', () => closePane(paneId), '×')
-        ]}
-        createNode={() => paneId}
-      >
+      <MosaicWindow<string> path={path} title={title} toolbarControls={toolbarControls}>
         {binding ? (
-          <SessionPaneContent session={session} onReconnect={handleReconnect} />
+          <SessionPaneContent
+            session={session}
+            binding={binding}
+            onReconnect={handleReconnect}
+            onConnect={() => void connectPane(paneId)}
+          />
         ) : (
           <div className="p-4 text-sm text-gray-500">Empty pane</div>
         )}
@@ -163,9 +246,9 @@ export function MosaicWorkspace(): React.JSX.Element {
 
   return (
     <Mosaic<string>
-      className="consoleri-mosaic h-full"
+      className="consoleri-mosaic mosaic-blueprint-theme bp5-dark h-full"
       value={layout}
-      onChange={(next) => persistWorkspace(next, workspace.panes)}
+      onChange={(next) => persistWorkspace(next, workspace.panes, { debounce: true })}
       renderTile={renderTile}
       zeroStateView={
         <div className="flex h-full items-center justify-center text-gray-500">
@@ -176,50 +259,8 @@ export function MosaicWorkspace(): React.JSX.Element {
   )
 }
 
-function removeFromLayout(node: MosaicNode<string>, paneId: string): MosaicNode<string> | null {
-  if (typeof node === 'string') {
-    return node === paneId ? null : node
-  }
-  if ('type' in node && node.type === 'split') {
-    const split = node as MosaicSplitNode<string>
-    const children = split.children
-      .map((c) => removeFromLayout(c, paneId))
-      .filter((c): c is MosaicNode<string> => c !== null)
-    if (children.length === 0) return null
-    if (children.length === 1) return children[0]
-    return { ...split, children }
-  }
-  return node
-}
+// Re-export for backward compatibility during transition
+export { addSessionToWorkspace, openSessionAndAddToWorkspace } from '../../session/openSession'
 
-export async function addSessionToWorkspace(session: SessionInfo): Promise<void> {
-  const paneId = nanoid()
-  const binding: PaneBinding = {
-    paneId,
-    sessionId: session.id,
-    protocol: session.protocol,
-    title: session.title
-  }
-
-  const { workspace, setWorkspace } = useAppStore.getState()
-  const panes = [...workspace.panes, binding]
-  const currentLayout = workspace.layout as MosaicNode<string> | null
-
-  let nextLayout: MosaicNode<string>
-  if (!currentLayout) {
-    nextLayout = paneId
-  } else if (typeof currentLayout === 'string') {
-    nextLayout = { type: 'split', direction: 'row', children: [currentLayout, paneId] }
-  } else if (currentLayout.type === 'split') {
-    nextLayout = {
-      ...currentLayout,
-      children: [...currentLayout.children, paneId]
-    }
-  } else {
-    nextLayout = paneId
-  }
-
-  const state: WorkspaceState = { layout: nextLayout, panes }
-  setWorkspace(state)
-  await window.consoleri.workspace.save(state)
-}
+// layoutSaveTimer is owned by appStore; referenced here for flush on beforeunload
+declare const layoutSaveTimer: ReturnType<typeof setTimeout> | null

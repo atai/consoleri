@@ -6,12 +6,19 @@ import type {
   HostFilter,
   HostGroup,
   HostInput,
+  LogEntry,
   OpenSessionRequest,
   ProfileInput,
   SessionInfo,
   WorkspaceState,
   ConnectionProfile,
-  WslDistro
+  DeployKeyRequest,
+  DeployKeyResult,
+  AssignableHost,
+  SshKeyInfo,
+  WslDistro,
+  UxProfile,
+  UxProfileInput
 } from '../shared/types'
 
 export interface ConsoleriAPI {
@@ -32,6 +39,14 @@ export interface ConsoleriAPI {
     create: (input: ProfileInput) => Promise<ConnectionProfile>
     update: (id: string, input: Partial<ProfileInput>) => Promise<ConnectionProfile>
     delete: (id: string) => Promise<void>
+    link: (hostId: string, profileId: string) => Promise<void>
+    unlink: (hostId: string, profileId: string) => Promise<void>
+    listHosts: (profileId: string) => Promise<Host[]>
+    duplicate: (
+      sourceId: string,
+      targetHostId?: string,
+      name?: string
+    ) => Promise<ConnectionProfile>
   }
   credentials: {
     store: (ref: string, secret: string) => Promise<void>
@@ -57,9 +72,12 @@ export interface ConsoleriAPI {
     }) => Promise<void>
     getRdpCredentials: (profileId: string) => Promise<{ username: string; password: string } | null>
     getVncPassword: (profileId: string) => Promise<string | null>
+    getLog: (sessionId: string) => Promise<LogEntry[]>
+    openLogWindow: (sessionId: string) => Promise<void>
     onData: (cb: (payload: { id: string; data: string }) => void) => () => void
     onExit: (cb: (payload: { id: string; code: number }) => void) => () => void
     onStatus: (cb: (payload: { id: string; status: string; error?: string }) => void) => () => void
+    onLog: (cb: (entry: LogEntry) => void) => () => void
   }
   wsl: {
     list: () => Promise<WslDistro[]>
@@ -68,6 +86,34 @@ export interface ConsoleriAPI {
     save: (state: WorkspaceState, name?: string) => Promise<unknown>
     load: () => Promise<WorkspaceState>
     getActive: () => Promise<unknown>
+  }
+  keys: {
+    list: () => Promise<SshKeyInfo[]>
+    add: (path: string, label?: string) => Promise<SshKeyInfo>
+    remove: (id: string) => Promise<void>
+    pickFile: () => Promise<string | null>
+    assign: (profileId: string, keyPath: string) => Promise<void>
+    deploy: (request: DeployKeyRequest) => Promise<DeployKeyResult>
+    storePassphrase: (keyPath: string, passphrase: string) => Promise<void>
+    listAssignableHosts: () => Promise<AssignableHost[]>
+  }
+  uxProfiles: {
+    list: (hostId?: string) => Promise<UxProfile[]>
+    get: (id: string) => Promise<UxProfile | null>
+    create: (input: UxProfileInput) => Promise<UxProfile>
+    update: (id: string, input: Partial<UxProfileInput>) => Promise<UxProfile>
+    delete: (id: string) => Promise<void>
+    duplicate: (sourceId: string, name?: string) => Promise<UxProfile>
+    getActive: () => Promise<UxProfile>
+    setActive: (id: string) => Promise<UxProfile>
+    listHosts: (profileId: string) => Promise<Host[]>
+    linkHost: (hostId: string, profileId: string) => Promise<void>
+    unlinkHost: (hostId: string) => Promise<void>
+    migrateSidebarWidth: (width: number) => Promise<void>
+  }
+  clipboard: {
+    readText: () => Promise<string>
+    writeText: (text: string) => Promise<void>
   }
 }
 
@@ -88,7 +134,13 @@ const consoleri: ConsoleriAPI = {
     list: (hostId) => ipcRenderer.invoke(IPC_CHANNELS.profilesList, hostId),
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.profilesCreate, input),
     update: (id, input) => ipcRenderer.invoke(IPC_CHANNELS.profilesUpdate, id, input),
-    delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.profilesDelete, id)
+    delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.profilesDelete, id),
+    link: (hostId, profileId) => ipcRenderer.invoke(IPC_CHANNELS.profilesLink, hostId, profileId),
+    unlink: (hostId, profileId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesUnlink, hostId, profileId),
+    listHosts: (profileId) => ipcRenderer.invoke(IPC_CHANNELS.profilesListHosts, profileId),
+    duplicate: (sourceId, targetHostId, name) =>
+      ipcRenderer.invoke(IPC_CHANNELS.profilesDuplicate, sourceId, targetHostId, name)
   },
   credentials: {
     store: (ref, secret) => ipcRenderer.invoke(IPC_CHANNELS.credentialsStore, ref, secret),
@@ -107,6 +159,9 @@ const consoleri: ConsoleriAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.sessionsRdpCredentials, profileId),
     getVncPassword: (profileId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.sessionsVncPassword, profileId),
+    getLog: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.sessionsLogGet, sessionId),
+    openLogWindow: (sessionId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.sessionsLogOpenWindow, sessionId),
     onData: (cb) => {
       const listener = (_: unknown, payload: { id: string; data: string }) => cb(payload)
       ipcRenderer.on(IPC_CHANNELS.sessionData, listener)
@@ -122,6 +177,11 @@ const consoleri: ConsoleriAPI = {
         cb(payload)
       ipcRenderer.on(IPC_CHANNELS.sessionStatus, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.sessionStatus, listener)
+    },
+    onLog: (cb) => {
+      const listener = (_: unknown, entry: LogEntry) => cb(entry)
+      ipcRenderer.on(IPC_CHANNELS.sessionLog, listener)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.sessionLog, listener)
     }
   },
   wsl: {
@@ -131,6 +191,38 @@ const consoleri: ConsoleriAPI = {
     save: (state, name) => ipcRenderer.invoke(IPC_CHANNELS.workspaceSave, state, name),
     load: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceLoad),
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceGetActive)
+  },
+  keys: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.keysList),
+    add: (path, label) => ipcRenderer.invoke(IPC_CHANNELS.keysAdd, path, label),
+    remove: (id) => ipcRenderer.invoke(IPC_CHANNELS.keysRemove, id),
+    pickFile: () => ipcRenderer.invoke(IPC_CHANNELS.keysPickFile),
+    assign: (profileId, keyPath) => ipcRenderer.invoke(IPC_CHANNELS.keysAssign, profileId, keyPath),
+    deploy: (request) => ipcRenderer.invoke(IPC_CHANNELS.keysDeploy, request),
+    storePassphrase: (keyPath, passphrase) =>
+      ipcRenderer.invoke(IPC_CHANNELS.keysStorePassphrase, keyPath, passphrase),
+    listAssignableHosts: () => ipcRenderer.invoke(IPC_CHANNELS.keysAssignableHosts)
+  },
+  uxProfiles: {
+    list: (hostId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesList, hostId),
+    get: (id) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesGet, id),
+    create: (input) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesCreate, input),
+    update: (id, input) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesUpdate, id, input),
+    delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesDelete, id),
+    duplicate: (sourceId, name) =>
+      ipcRenderer.invoke(IPC_CHANNELS.uxProfilesDuplicate, sourceId, name),
+    getActive: () => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesGetActive),
+    setActive: (id) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesSetActive, id),
+    listHosts: (profileId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesListHosts, profileId),
+    linkHost: (hostId, profileId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.uxProfilesLinkHost, hostId, profileId),
+    unlinkHost: (hostId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesUnlinkHost, hostId),
+    migrateSidebarWidth: (width) =>
+      ipcRenderer.invoke(IPC_CHANNELS.uxProfilesMigrateSidebarWidth, width)
+  },
+  clipboard: {
+    readText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardReadText),
+    writeText: (text) => ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text)
   }
 }
 

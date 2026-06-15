@@ -1,4 +1,5 @@
-import { applyAuthToConnectConfig } from '@consoleri/core'
+import { applyAuthToConnectConfig, isKeyFileRef, keyFilePassphraseRef, keyPathFromRef } from '@consoleri/core'
+import { readFileSync } from 'fs'
 import type { ConnectionProfile, Host } from '../../shared/types'
 import { credentialVault } from '../hosts/CredentialVault'
 
@@ -6,6 +7,7 @@ export interface ResolvedCredentials {
   username: string
   password?: string
   privateKey?: string
+  passphrase?: string
 }
 
 export class CredentialResolver {
@@ -14,6 +16,20 @@ export class CredentialResolver {
     if (!profile.credentialRef) {
       return { username }
     }
+
+    if (isKeyFileRef(profile.credentialRef)) {
+      const keyPath = keyPathFromRef(profile.credentialRef)
+      let privateKey: string
+      try {
+        privateKey = readFileSync(keyPath, 'utf8')
+      } catch {
+        throw new Error(`Could not read SSH key file: ${keyPath}`)
+      }
+      const passphrase =
+        (await credentialVault.retrieve(keyFilePassphraseRef(keyPath))) ?? undefined
+      return { username, privateKey, passphrase }
+    }
+
     const secret = await credentialVault.retrieve(profile.credentialRef)
     if (!secret) {
       throw new Error(
@@ -50,15 +66,19 @@ export function resolveHostAndProfile(
   listProfiles: (hostId: string) => ConnectionProfile[]
 ): { host: Host | null; profile: ConnectionProfile | null } {
   const profile = profileId ? listProfiles(hostId ?? '').find((p) => p.id === profileId) ?? null : null
-  const host = hostId
-    ? getHost(hostId)
-    : profile?.hostId
-      ? getHost(profile.hostId)
-      : null
+  const host = hostId ? getHost(hostId) : null
 
-  if (host && !profile) {
-    const profiles = listProfiles(host.id)
-    return { host, profile: profiles[0] ?? null }
+  if (!host) {
+    return { host, profile }
   }
-  return { host, profile: profile ?? (host ? listProfiles(host.id)[0] ?? null : null) }
+
+  const profiles = listProfiles(host.id)
+  const defaultProfile = host.defaultProfileId
+    ? profiles.find((p) => p.id === host.defaultProfileId) ?? null
+    : null
+
+  return {
+    host,
+    profile: profile ?? defaultProfile ?? profiles[0] ?? null
+  }
 }

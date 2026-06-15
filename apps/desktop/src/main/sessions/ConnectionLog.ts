@@ -1,14 +1,34 @@
+import {
+  maxLogEntriesForVerbosity,
+  shouldIncludeLogEntry,
+  type HostLogVerbosity
+} from '@consoleri/core'
 import type { LogLevel, LogEntry } from '../../shared/types'
-
-const MAX_ENTRIES = 500
 
 type LogListener = (entry: LogEntry) => void
 
 export class ConnectionLog {
   private buffers = new Map<string, LogEntry[]>()
   private listeners = new Map<string, Set<LogListener>>()
+  private verbosity = new Map<string, HostLogVerbosity>()
+  private entryLimits = new Map<string, number>()
 
-  append(sessionId: string, level: LogLevel, message: string, meta?: Record<string, unknown>): LogEntry {
+  setSessionVerbosity(sessionId: string, verbosity: HostLogVerbosity): void {
+    this.verbosity.set(sessionId, verbosity)
+    this.entryLimits.set(sessionId, maxLogEntriesForVerbosity(verbosity))
+  }
+
+  append(
+    sessionId: string,
+    level: LogLevel,
+    message: string,
+    meta?: Record<string, unknown>
+  ): LogEntry | null {
+    const verbosity = this.verbosity.get(sessionId) ?? 'info'
+    if (!shouldIncludeLogEntry(verbosity, level, meta)) {
+      return null
+    }
+
     const entry: LogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       sessionId,
@@ -19,7 +39,8 @@ export class ConnectionLog {
     }
     const buf = this.buffers.get(sessionId) ?? []
     buf.push(entry)
-    if (buf.length > MAX_ENTRIES) buf.shift()
+    const maxEntries = this.entryLimits.get(sessionId) ?? 500
+    while (buf.length > maxEntries) buf.shift()
     this.buffers.set(sessionId, buf)
 
     for (const listener of this.listeners.get(sessionId) ?? []) {
@@ -49,6 +70,8 @@ export class ConnectionLog {
   removeSession(sessionId: string): void {
     this.buffers.delete(sessionId)
     this.listeners.delete(sessionId)
+    this.verbosity.delete(sessionId)
+    this.entryLimits.delete(sessionId)
   }
 }
 

@@ -1,8 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { mountTerminal, unmountTerminal, acquireTerminal } from '../../terminal/TerminalPool'
+import {
+  mountTerminal,
+  unmountTerminal,
+  acquireTerminal,
+  getTerminal,
+  applyTerminalOptions
+} from '../../terminal/TerminalPool'
+import { attachClipboardHandlers } from '../../terminal/clipboard'
+import { useUxProfileStore } from '../../stores/uxProfileStore'
 
 interface TerminalPaneProps {
   sessionId: string
+  hostId?: string | null
   scrollback?: string | null
   onReconnect?: () => void
   disconnected?: boolean
@@ -10,17 +19,20 @@ interface TerminalPaneProps {
 
 export function TerminalPane({
   sessionId,
+  hostId,
   scrollback,
   onReconnect,
   disconnected
 }: TerminalPaneProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
+  const resolveTerminalForHost = useUxProfileStore((s) => s.resolveTerminalForHost)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const entry = mountTerminal(sessionId, container)
+    const appearance = resolveTerminalForHost(hostId)
+    const entry = mountTerminal(sessionId, container, appearance)
 
     if (scrollback) {
       entry.term.reset()
@@ -41,13 +53,28 @@ export function TerminalPane({
     })
     resizeObserver.observe(container)
 
+    const clipboardHandlers = attachClipboardHandlers(entry.term, container)
+
     return () => {
       dataDisposable.dispose()
       unsubData()
       resizeObserver.disconnect()
+      clipboardHandlers.dispose()
       unmountTerminal(sessionId)
     }
-  }, [sessionId, scrollback])
+  }, [sessionId, scrollback, hostId, resolveTerminalForHost])
+
+  useEffect(() => {
+    return useUxProfileStore.subscribe((state, prev) => {
+      if (state.profiles === prev.profiles && state.activeId === prev.activeId) return
+      const entry = getTerminal(sessionId)
+      if (!entry) return
+      const appearance = state.resolveTerminalForHost(hostId)
+      entry.appearance = appearance
+      applyTerminalOptions(entry.term, appearance)
+      if (entry.mounted) entry.fitAddon.fit()
+    })
+  }, [sessionId, hostId])
 
   return (
     <div className="flex h-full flex-col bg-[#0d1117]">

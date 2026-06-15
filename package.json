@@ -3,22 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "description": "Consoleri — remote host console manager",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "dev": "npm run dev -w @consoleri/desktop",
-    "build": "npm run build -w @consoleri/desktop",
-    "package": "npm run build:win -w @consoleri/desktop",
-    "lint": "npm run lint -w @consoleri/desktop",
-    "typecheck": "npm run typecheck -w @consoleri/desktop",
-    "test": "npm run test -w @consoleri/core",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/pnpm.mjs --filter @consoleri/desktop build",
+    "package": "node scripts/pnpm.mjs --filter @consoleri/desktop build:win",
+    "lint": "node scripts/pnpm.mjs --filter @consoleri/desktop lint",
+    "typecheck": "node scripts/pnpm.mjs --filter @consoleri/desktop typecheck",
+    "test": "node scripts/pnpm.mjs --filter @consoleri/core test",
+    "install:deps": "node scripts/pnpm.mjs install",
     "rebuild-native": "node scripts/rebuild-native.mjs",
     "install:electron": "node node_modules/electron/install.js",
     "postinstall": "node scripts/postinstall.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "devDependencies": {
+    "pnpm": "10.12.1"
   }
 }

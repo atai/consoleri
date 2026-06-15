@@ -37,3 +37,31 @@ export function removeFromLayout<T extends string>(
   if (children.length === 1) return children[0]
   return { ...split, children }
 }
+
+export function splitPaneInLayout<T extends string>(
+  node: MosaicNode<T>,
+  targetPaneId: T,
+  newPaneId: T,
+  direction: 'row' | 'column',
+  splitPercentages: number[] = [50, 50]
+): MosaicNode<T> | null {
+  if (typeof node === 'string') {
+    if (node !== targetPaneId) return node
+    return {
+      type: 'split',
+      direction,
+      children: [targetPaneId, newPaneId],
+      splitPercentages
+    }
+  }
+  if (node.type === 'tabs') {
+    return node
+  }
+  const split = node as MosaicSplitNode<T>
+  const children = split.children.map((child) =>
+    splitPaneInLayout(child, targetPaneId, newPaneId, direction, splitPercentages)
+  )
+  const changed = children.some((child, i) => child !== split.children[i])
+  if (!changed) return node
+  return { ...split, children: children as MosaicNode<T>[] }
+}

@@ -2,6 +2,8 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { WebglAddon } from '@xterm/addon-webgl'
+import type { TerminalAppearance } from '@consoleri/core'
+import { DEFAULT_TERMINAL_APPEARANCE } from '@consoleri/core'
 import '@xterm/xterm/css/xterm.css'
 
 export interface PooledTerminal {
@@ -11,64 +13,76 @@ export interface PooledTerminal {
   serializeAddon: SerializeAddon
   hostEl: HTMLDivElement
   mounted: boolean
+  appearance: TerminalAppearance
 }
 
 const pool = new Map<string, PooledTerminal>()
 
-const TERM_THEME = {
-  background: '#0d1117',
-  foreground: '#c9d1d9',
-  cursor: '#58a6ff',
-  selectionBackground: '#264f78',
-  black: '#484f58',
-  red: '#ff7b72',
-  green: '#3fb950',
-  yellow: '#d29922',
-  blue: '#58a6ff',
-  magenta: '#bc8cff',
-  cyan: '#39c5cf',
-  white: '#b1bac4',
-  brightBlack: '#6e7681',
-  brightRed: '#ffa198',
-  brightGreen: '#56d364',
-  brightYellow: '#e3b341',
-  brightBlue: '#79c0ff',
-  brightMagenta: '#d2a8ff',
-  brightCyan: '#56d4dd',
-  brightWhite: '#f0f6fc'
+export function applyTerminalOptions(term: Terminal, appearance: TerminalAppearance): void {
+  term.options.theme = { ...appearance.theme }
+  term.options.fontSize = appearance.fontSize
+  term.options.fontFamily = appearance.fontFamily
+  term.options.cursorBlink = appearance.cursorBlink
 }
 
-export function acquireTerminal(sessionId: string): PooledTerminal {
+export function applyToAllTerminals(appearance: TerminalAppearance): void {
+  for (const entry of pool.values()) {
+    entry.appearance = appearance
+    applyTerminalOptions(entry.term, appearance)
+    if (entry.mounted) {
+      entry.fitAddon.fit()
+    }
+  }
+}
+
+function createTerminal(
+  appearance: TerminalAppearance
+): { term: Terminal; fitAddon: FitAddon; serializeAddon: SerializeAddon } {
+  const term = new Terminal({
+    cursorBlink: appearance.cursorBlink,
+    fontSize: appearance.fontSize,
+    fontFamily: appearance.fontFamily,
+    theme: appearance.theme,
+    scrollback: appearance.scrollback,
+    allowProposedApi: true
+  })
+  const fitAddon = new FitAddon()
+  const serializeAddon = new SerializeAddon()
+  term.loadAddon(fitAddon)
+  term.loadAddon(serializeAddon)
+  try {
+    term.loadAddon(new WebglAddon())
+  } catch {
+    /* WebGL unavailable */
+  }
+  return { term, fitAddon, serializeAddon }
+}
+
+export function acquireTerminal(
+  sessionId: string,
+  appearance: TerminalAppearance = DEFAULT_TERMINAL_APPEARANCE
+): PooledTerminal {
   let entry = pool.get(sessionId)
   if (!entry) {
     const hostEl = document.createElement('div')
     hostEl.className = 'h-full w-full'
-    const term = new Terminal({
-      cursorBlink: true,
-      fontSize: 13,
-      fontFamily: 'Consolas, "Cascadia Mono", "Courier New", monospace',
-      theme: TERM_THEME,
-      scrollback: 10000,
-      allowProposedApi: true
-    })
-    const fitAddon = new FitAddon()
-    const serializeAddon = new SerializeAddon()
-    term.loadAddon(fitAddon)
-    term.loadAddon(serializeAddon)
-    try {
-      term.loadAddon(new WebglAddon())
-    } catch {
-      /* WebGL unavailable */
-    }
+    const { term, fitAddon, serializeAddon } = createTerminal(appearance)
     term.open(hostEl)
-    entry = { sessionId, term, fitAddon, serializeAddon, hostEl, mounted: false }
+    entry = { sessionId, term, fitAddon, serializeAddon, hostEl, mounted: false, appearance }
     pool.set(sessionId, entry)
+  } else {
+    entry.appearance = appearance
+    applyTerminalOptions(entry.term, appearance)
   }
   return entry
 }
 
-export function mountTerminal(sessionId: string, container: HTMLElement): PooledTerminal {
-  const entry = acquireTerminal(sessionId)
+export function mountTerminal(
+  sessionId: string,
+  container: HTMLElement,
+  appearance: TerminalAppearance = DEFAULT_TERMINAL_APPEARANCE
+): PooledTerminal {
+  const entry = acquireTerminal(sessionId, appearance)
   if (entry.hostEl.parentElement !== container) {
     container.appendChild(entry.hostEl)
   }
