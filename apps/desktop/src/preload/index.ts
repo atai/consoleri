@@ -61,8 +61,8 @@ export interface ConsoleriAPI {
   sessions: {
     open: (request: OpenSessionRequest, cols?: number, rows?: number) => Promise<SessionInfo>
     close: (sessionId: string) => Promise<void>
-    write: (sessionId: string, data: string) => Promise<void>
-    resize: (sessionId: string, cols: number, rows: number) => Promise<void>
+    write: (sessionId: string, data: string) => void
+    resize: (sessionId: string, cols: number, rows: number) => void
     list: () => Promise<SessionInfo[]>
     reconnect: (sessionId: string) => Promise<SessionInfo | null>
     getConnectRequest: (sessionId: string) => Promise<OpenSessionRequest | null>
@@ -179,9 +179,9 @@ const consoleri: ConsoleriAPI = {
   sessions: {
     open: (request, cols, rows) => ipcRenderer.invoke(IPC_CHANNELS.sessionsOpen, request, cols, rows),
     close: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.sessionsClose, sessionId),
-    write: (sessionId, data) => ipcRenderer.invoke(IPC_CHANNELS.sessionsWrite, sessionId, data),
+    write: (sessionId, data) => ipcRenderer.send(IPC_CHANNELS.sessionsWrite, sessionId, data),
     resize: (sessionId, cols, rows) =>
-      ipcRenderer.invoke(IPC_CHANNELS.sessionsResize, sessionId, cols, rows),
+      ipcRenderer.send(IPC_CHANNELS.sessionsResize, sessionId, cols, rows),
     list: () => ipcRenderer.invoke(IPC_CHANNELS.sessionsList),
     reconnect: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.sessionsReconnect, sessionId),
     getConnectRequest: (sessionId) =>

@@ -20,7 +20,9 @@
     "build:win": "pnpm run build && electron-builder --win",
     "build:mac": "pnpm run build && electron-builder --mac",
     "build:linux": "pnpm run build && electron-builder --linux",
-    "package": "pnpm run build:win"
+    "package": "pnpm run build:win",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@consoleri/core": "workspace:*",
@@ -71,6 +73,8 @@
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^3.2.4",
+    "jsdom": "^26.1.0"
   }
 }

@@ -1,3 +1,4 @@
+import net from 'node:net'
 import { Client, type ConnectConfig } from 'ssh2'
 import { defaultPortForProtocol, sshDebugEnabled } from '@consoleri/core'
 import type { ConnectionProfile, Host } from '../../shared/types'
@@ -49,6 +50,12 @@ function toConnectConfig(
   return config
 }
 
+function createNoDelaySocket(host: string, port: number): net.Socket {
+  const sock = net.connect({ host, port })
+  sock.setNoDelay(true)
+  return sock
+}
+
 function connectWithJump(
   bastionConfig: ConnectConfig,
   targetConfig: ConnectConfig,
@@ -92,7 +99,10 @@ function connectWithJump(
         log.append(sessionId, 'error', `Jump host error: ${err.message}`)
         reject(err)
       })
-      .connect(bastionConfig)
+      .connect({
+        ...bastionConfig,
+        sock: createNoDelaySocket(bastionConfig.host!, bastionConfig.port ?? 22)
+      })
   })
 }
 
@@ -134,7 +144,10 @@ export class SshSession extends BaseTransport {
           log.append(sessionId, 'error', `SSH error: ${err.message}`)
           reject(err)
         })
-        c.connect(targetConfig)
+        c.connect({
+          ...targetConfig,
+          sock: createNoDelaySocket(targetConfig.host!, targetConfig.port ?? 22)
+        })
       })
     }
 

@@ -10,7 +10,7 @@
     "package": "node scripts/pnpm.mjs --filter @consoleri/desktop build:win",
     "lint": "node scripts/pnpm.mjs --filter @consoleri/desktop lint",
     "typecheck": "node scripts/pnpm.mjs --filter @consoleri/desktop typecheck",
-    "test": "node scripts/pnpm.mjs --filter @consoleri/core test",
+    "test": "node scripts/pnpm.mjs --filter @consoleri/core test && node scripts/pnpm.mjs --filter @consoleri/desktop test",
     "install:deps": "node scripts/pnpm.mjs install",
     "rebuild-native": "node scripts/rebuild-native.mjs",
     "install:electron": "node node_modules/electron/install.js",

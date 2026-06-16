@@ -102,11 +102,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     sessionManager.close(sessionId)
   })
 
-  ipcMain.handle(IPC_CHANNELS.sessionsWrite, (_e, sessionId: string, data: string) => {
+  ipcMain.on(IPC_CHANNELS.sessionsWrite, (_e, sessionId: string, data: string) => {
     sessionManager.write(sessionId, data)
   })
 
-  ipcMain.handle(IPC_CHANNELS.sessionsResize, (_e, sessionId: string, cols: number, rows: number) => {
+  ipcMain.on(IPC_CHANNELS.sessionsResize, (_e, sessionId: string, cols: number, rows: number) => {
     sessionManager.resize(sessionId, cols, rows)
   })
 

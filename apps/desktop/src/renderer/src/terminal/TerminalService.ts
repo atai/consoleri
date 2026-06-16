@@ -29,7 +29,7 @@ interface WriteBuffer {
   rafId: number | null
 }
 
-class TerminalService {
+export class TerminalService {
   private readonly pool = new Map<string, PooledTerminal>()
   private readonly writeBuffers = new Map<string, WriteBuffer>()
   private readonly inputDisposables = new Map<string, IDisposable>()
