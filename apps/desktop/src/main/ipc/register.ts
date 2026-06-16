@@ -160,6 +160,13 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     return sessionManager.getLogEntries(sessionId)
   })
 
+  ipcMain.handle(
+    IPC_CHANNELS.sessionsLogAppend,
+    (_e, sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string) => {
+      sessionManager.appendSessionLog(sessionId, level, message)
+    }
+  )
+
   ipcMain.handle(IPC_CHANNELS.sessionsLogOpenWindow, (_e, sessionId: string) => {
     openLogWindow(sessionId, getWindow())
   })

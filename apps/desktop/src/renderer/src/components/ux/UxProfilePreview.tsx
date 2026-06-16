@@ -2,11 +2,15 @@ import { useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { TerminalAppearance } from '@consoleri/core'
+import { buildTerminalOptions, applyTerminalOptions } from '../../terminal/terminalOptions'
 import '@xterm/xterm/css/xterm.css'
 
 interface UxProfilePreviewProps {
   appearance: TerminalAppearance
 }
+
+const PREVIEW_FONT_SIZE_CAP = 12
+const PREVIEW_SCROLLBACK = 100
 
 export function UxProfilePreview({ appearance }: UxProfilePreviewProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -17,14 +21,13 @@ export function UxProfilePreview({ appearance }: UxProfilePreviewProps): React.J
     const container = containerRef.current
     if (!container) return
 
-    const term = new Terminal({
-      cursorBlink: appearance.cursorBlink,
-      fontSize: Math.min(appearance.fontSize, 12),
-      fontFamily: appearance.fontFamily,
-      theme: appearance.theme,
-      scrollback: 100,
-      disableStdin: true
-    })
+    const term = new Terminal(
+      buildTerminalOptions(appearance, {
+        fontSize: Math.min(appearance.fontSize, PREVIEW_FONT_SIZE_CAP),
+        scrollback: PREVIEW_SCROLLBACK,
+        disableStdin: true
+      })
+    )
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(container)
@@ -46,10 +49,10 @@ export function UxProfilePreview({ appearance }: UxProfilePreviewProps): React.J
     const term = termRef.current
     const fitAddon = fitRef.current
     if (!term) return
-    term.options.theme = { ...appearance.theme }
-    term.options.fontSize = Math.min(appearance.fontSize, 12)
-    term.options.fontFamily = appearance.fontFamily
-    term.options.cursorBlink = appearance.cursorBlink
+    applyTerminalOptions(term, appearance, {
+      fontSize: Math.min(appearance.fontSize, PREVIEW_FONT_SIZE_CAP),
+      scrollback: PREVIEW_SCROLLBACK
+    })
     fitAddon?.fit()
   }, [appearance])
 

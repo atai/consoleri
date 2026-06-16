@@ -80,6 +80,11 @@ export interface ConsoleriAPI {
     getRdpCredentials: (profileId: string) => Promise<{ username: string; password: string } | null>
     getVncPassword: (profileId: string) => Promise<string | null>
     getLog: (sessionId: string) => Promise<LogEntry[]>
+    appendLog: (
+      sessionId: string,
+      level: 'debug' | 'info' | 'warn' | 'error',
+      message: string
+    ) => Promise<void>
     openLogWindow: (sessionId: string) => Promise<void>
     openSessionWindow: (sessionId: string) => Promise<void>
     onData: (cb: (payload: { id: string; data: string }) => void) => () => void
@@ -187,6 +192,8 @@ const consoleri: ConsoleriAPI = {
     getVncPassword: (profileId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.sessionsVncPassword, profileId),
     getLog: (sessionId: string) => ipcRenderer.invoke(IPC_CHANNELS.sessionsLogGet, sessionId),
+    appendLog: (sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.sessionsLogAppend, sessionId, level, message),
     openLogWindow: (sessionId: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.sessionsLogOpenWindow, sessionId),
     openSessionWindow: (sessionId: string) =>

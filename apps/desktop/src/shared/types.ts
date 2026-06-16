@@ -233,6 +233,7 @@ export const IPC_CHANNELS = {
   sessionStatus: 'session:status',
   sessionLog: 'session:log',
   sessionsLogGet: 'sessions:log:get',
+  sessionsLogAppend: 'sessions:log:append',
   sessionsLogOpenWindow: 'sessions:log:openWindow',
   sessionsOpenSessionWindow: 'sessions:openSessionWindow',
   keysList: 'keys:list',

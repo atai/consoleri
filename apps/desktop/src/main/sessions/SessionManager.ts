@@ -273,6 +273,14 @@ export class SessionManager {
     return connectionLog.getEntries(sessionId)
   }
 
+  appendSessionLog(
+    sessionId: string,
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string
+  ): void {
+    this.appendLog(sessionId, level, message)
+  }
+
   appendOperationLog(
     logId: string,
     level: 'debug' | 'info' | 'warn' | 'error',

@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react'
 import {
   mountTerminal,
   unmountTerminal,
-  acquireTerminal,
-  getTerminal,
-  applyTerminalOptions
+  restoreScrollback,
+  attachTerminalInput,
+  resizeTerminal,
+  applyTerminalAppearance
 } from '../../terminal/TerminalPool'
 import { attachClipboardHandlers } from '../../terminal/clipboard'
 import { useUxProfileStore } from '../../stores/uxProfileStore'
@@ -35,29 +36,20 @@ export function TerminalPane({
     const entry = mountTerminal(sessionId, container, appearance)
 
     if (scrollback) {
-      entry.term.reset()
-      entry.term.write(scrollback)
+      restoreScrollback(sessionId, scrollback)
     }
 
-    const dataDisposable = entry.term.onData((data) => {
-      window.consoleri.sessions.write(sessionId, data)
-    })
-
-    const unsubData = window.consoleri.sessions.onData(({ id, data }) => {
-      if (id === sessionId) entry.term.write(data)
-    })
+    const inputDisposable = attachTerminalInput(sessionId)
 
     const resizeObserver = new ResizeObserver(() => {
-      entry.fitAddon.fit()
-      window.consoleri.sessions.resize(sessionId, entry.term.cols, entry.term.rows)
+      resizeTerminal(sessionId)
     })
     resizeObserver.observe(container)
 
     const clipboardHandlers = attachClipboardHandlers(entry.term, container)
 
     return () => {
-      dataDisposable.dispose()
-      unsubData()
+      inputDisposable.dispose()
       resizeObserver.disconnect()
       clipboardHandlers.dispose()
       unmountTerminal(sessionId)
@@ -67,12 +59,8 @@ export function TerminalPane({
   useEffect(() => {
     return useUxProfileStore.subscribe((state, prev) => {
       if (state.profiles === prev.profiles && state.activeId === prev.activeId) return
-      const entry = getTerminal(sessionId)
-      if (!entry) return
       const appearance = state.resolveTerminalForHost(hostId)
-      entry.appearance = appearance
-      applyTerminalOptions(entry.term, appearance)
-      if (entry.mounted) entry.fitAddon.fit()
+      applyTerminalAppearance(sessionId, appearance)
     })
   }, [sessionId, hostId])
 
@@ -95,10 +83,4 @@ export function TerminalPane({
       <div ref={containerRef} className="min-h-0 flex-1 p-1" />
     </div>
   )
-}
-
-export function restoreScrollback(sessionId: string, data: string): void {
-  const entry = acquireTerminal(sessionId)
-  entry.term.reset()
-  entry.term.write(data)
 }
