@@ -38,6 +38,11 @@ function isShiftInsert(e: KeyboardEvent): boolean {
   return e.shiftKey && e.key === 'Insert'
 }
 
+function consumeKeyEvent(event: KeyboardEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
 export interface ClipboardHandlers {
   dispose: () => void
 }
@@ -50,21 +55,25 @@ export function attachClipboardHandlers(
     if (event.type !== 'keydown') return true
 
     if (isExplicitCopy(event) || isCtrlInsert(event)) {
+      consumeKeyEvent(event)
       void copySelection(term)
       return false
     }
 
     if (isExplicitPaste(event) || isShiftInsert(event)) {
+      consumeKeyEvent(event)
       void pasteFromClipboard(term)
       return false
     }
 
     if (isCtrlC(event) && term.hasSelection()) {
+      consumeKeyEvent(event)
       void copySelection(term)
       return false
     }
 
     if (isCtrlV(event)) {
+      consumeKeyEvent(event)
       void pasteFromClipboard(term)
       return false
     }

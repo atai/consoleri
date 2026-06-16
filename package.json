@@ -14,7 +14,8 @@
     "install:deps": "node scripts/pnpm.mjs install",
     "rebuild-native": "node scripts/rebuild-native.mjs",
     "install:electron": "node node_modules/electron/install.js",
-    "postinstall": "node scripts/postinstall.mjs"
+    "postinstall": "node scripts/postinstall.mjs",
+    "release": "bash scripts/release.sh"
   },
   "engines": {
     "node": ">=20",

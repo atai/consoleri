@@ -3,7 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { APP_NAME, appIconPath } from '../appBranding'
 import { sessionManager } from '../sessions/SessionManager'
-import { formatSessionWindowTitle, joinWindowTitle } from '../windowTitles'
+import { formatSessionWindowTitle, joinWindowTitle, pinBrowserWindowTitle } from '../windowTitles'
 
 const sessionWindows = new Map<string, BrowserWindow>()
 
@@ -13,10 +13,7 @@ export function getSessionWindow(sessionId: string): BrowserWindow | undefined {
   return undefined
 }
 
-export function openSessionWindow(
-  sessionId: string,
-  parent: BrowserWindow | null
-): BrowserWindow {
+export function openSessionWindow(sessionId: string): BrowserWindow {
   const existing = getSessionWindow(sessionId)
   const info = sessionManager.list().find((s) => s.id === sessionId)
   const title = info
@@ -37,7 +34,6 @@ export function openSessionWindow(
     title,
     icon: appIconPath(),
     backgroundColor: '#0f1117',
-    parent: parent ?? undefined,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -45,6 +41,11 @@ export function openSessionWindow(
       nodeIntegration: false,
       sandbox: false
     }
+  })
+
+  pinBrowserWindowTitle(win, () => {
+    const session = sessionManager.list().find((s) => s.id === sessionId)
+    return session ? formatSessionWindowTitle(session) : joinWindowTitle('Session', APP_NAME)
   })
 
   sessionWindows.set(sessionId, win)

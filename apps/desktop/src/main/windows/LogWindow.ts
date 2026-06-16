@@ -3,7 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { appIconPath } from '../appBranding'
 import { sessionManager } from '../sessions/SessionManager'
-import { formatLogWindowTitle, type LogWindowKind } from '../windowTitles'
+import { formatLogWindowTitle, pinBrowserWindowTitle, type LogWindowKind } from '../windowTitles'
 
 const logWindows = new Map<string, BrowserWindow>()
 
@@ -89,6 +89,8 @@ export function openLogWindow(
       sandbox: false
     }
   })
+
+  pinBrowserWindowTitle(win, () => resolveLogTitle(logId))
 
   logWindows.set(logId, win)
   sessionManager.setLogWindow(win)

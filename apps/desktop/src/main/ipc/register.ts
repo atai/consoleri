@@ -172,7 +172,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   })
 
   ipcMain.handle(IPC_CHANNELS.sessionsOpenSessionWindow, (_e, sessionId: string) => {
-    openSessionWindow(sessionId, getWindow())
+    openSessionWindow(sessionId)
   })
 
   ipcMain.handle(IPC_CHANNELS.workspaceGetActive, () => hostRepository.getActiveWorkspace())

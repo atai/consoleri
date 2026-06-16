@@ -1,3 +1,4 @@
+import type { BrowserWindow } from 'electron'
 import { APP_NAME } from './appBranding'
 import { hostRepository } from './hosts/HostRepository'
 import type { SessionInfo } from '../shared/types'
@@ -6,6 +7,21 @@ export const WINDOW_TITLE_SEP = ' - '
 
 export function joinWindowTitle(...parts: string[]): string {
   return parts.filter((p) => p.length > 0).join(WINDOW_TITLE_SEP)
+}
+
+/** Keep BrowserWindow.title from main process; re-apply after HTML `<title>` loads. */
+export function pinBrowserWindowTitle(win: BrowserWindow, getTitle: () => string): void {
+  const apply = (): void => {
+    if (win.isDestroyed()) return
+    win.setTitle(getTitle())
+  }
+
+  apply()
+  win.webContents.on('page-title-updated', (event) => {
+    event.preventDefault()
+    apply()
+  })
+  win.webContents.on('did-finish-load', apply)
 }
 
 function hostProfileParts(hostId?: string | null, profileId?: string | null): string[] {

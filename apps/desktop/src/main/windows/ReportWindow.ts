@@ -3,7 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { appIconPath } from '../appBranding'
 import { reportRepository } from '../reports/ReportRepository'
-import { formatReportWindowTitle } from '../windowTitles'
+import { formatReportWindowTitle, pinBrowserWindowTitle } from '../windowTitles'
 import { registerReportWindow } from '../reports/ReportRunner'
 
 const reportWindows = new Map<string, BrowserWindow>()
@@ -39,6 +39,10 @@ export function openReportWindow(
       sandbox: false
     }
   })
+
+  pinBrowserWindowTitle(win, () =>
+    formatReportWindowTitle(reportRepository.get(reportId)?.name ?? 'Report')
+  )
 
   reportWindows.set(reportId, win)
   registerReportWindow(reportId, win)

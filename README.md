@@ -55,3 +55,27 @@ npm run package
 ```bash
 npm run test
 ```
+
+## Release
+
+Prerequisites:
+
+- [git-cliff](https://git-cliff.org/) in `PATH` (`scoop install git-cliff` on Windows)
+- Git Bash or another `bash` shell (`bash` ships with Git for Windows)
+- Clean working tree on `main` or `master`
+
+```bash
+# Preview the next version and changelog
+npm run release -- --dry-run patch
+
+# Bump version, update CHANGELOG.md, commit, and tag
+npm run test
+npm run release -- patch   # or minor | major
+
+# Publish
+git push origin main
+git push origin vX.Y.Z
+```
+
+Release commits use the message `chore(release): vX.Y.Z` and are excluded from future changelogs.
+Pass `--no-test` to skip the pre-release test run.
