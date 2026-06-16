@@ -10,6 +10,7 @@ import { sessionFactory } from './SessionFactory'
 import type { ITransport } from './Transport'
 import { RdpProxy } from './RdpProxy'
 import { VncProxy } from './VncProxy'
+import { formatSessionWindowTitle } from '../windowTitles'
 
 interface ManagedSession {
   info: SessionInfo
@@ -80,6 +81,14 @@ export class SessionManager {
 
   unregisterSessionWindow(sessionId: string): void {
     this.sessionWindows.delete(sessionId)
+  }
+
+  private updateSessionWindowTitle(sessionId: string): void {
+    const win = this.sessionWindows.get(sessionId)
+    const session = this.sessions.get(sessionId)
+    if (win && !win.isDestroyed() && session) {
+      win.setTitle(formatSessionWindowTitle(session.info))
+    }
   }
 
   private appendLog(sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
@@ -170,6 +179,7 @@ export class SessionManager {
         this.attachTransport(id, result.transport)
       }
       this.updateStatus(id, 'connected')
+      this.updateSessionWindowTitle(id)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.appendLog(id, 'error', message)
@@ -212,6 +222,7 @@ export class SessionManager {
         this.attachTransport(sessionId, result.transport)
       }
       this.updateStatus(sessionId, 'connected')
+      this.updateSessionWindowTitle(sessionId)
       return existing.info
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

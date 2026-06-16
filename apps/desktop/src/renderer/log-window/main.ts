@@ -13,7 +13,10 @@ declare global {
 const logEl = document.getElementById('log')!
 const titleEl = document.getElementById('title')!
 const sessionId = window.logApi.getSessionId()
-titleEl.textContent = `Connection log — ${sessionId.slice(0, 8)}`
+const headerTitle =
+  new URLSearchParams(window.location.search).get('headerTitle') ?? 'Connection log'
+titleEl.textContent = headerTitle
+document.title = headerTitle
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString()

@@ -7,7 +7,7 @@ import { uxProfileRepository } from '../ux/UxProfileRepository'
 import { credentialVault } from '../hosts/CredentialVault'
 import { sessionManager } from '../sessions/SessionManager'
 import { listWslDistros } from '../sessions/shellUtils'
-import { openLogWindow } from '../windows/LogWindow'
+import { openLogWindow, registerLogContext } from '../windows/LogWindow'
 import { openReportWindow } from '../windows/ReportWindow'
 import { openSessionWindow } from '../windows/SessionWindow'
 import { sshKeyService } from '../keys/SshKeyService'
@@ -188,8 +188,17 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
 
   ipcMain.handle(IPC_CHANNELS.keysDeploy, async (_e, request: DeployKeyRequest) => {
     const logId = request.logId ?? nanoid()
+    registerLogContext(logId, {
+      kind: 'deploy',
+      hostId: request.hostId,
+      profileId: request.profileId
+    })
     if (request.openLog) {
-      openLogWindow(logId, getWindow(), 'Deploy log')
+      openLogWindow(logId, getWindow(), {
+        kind: 'deploy',
+        hostId: request.hostId,
+        profileId: request.profileId
+      })
     }
     const result = await sshKeyDeployer.deploy({ ...request, logId })
     return { ...result, logId }

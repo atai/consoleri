@@ -3,6 +3,7 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { appIconPath } from '../appBranding'
 import { reportRepository } from '../reports/ReportRepository'
+import { formatReportWindowTitle } from '../windowTitles'
 import { registerReportWindow } from '../reports/ReportRunner'
 
 const reportWindows = new Map<string, BrowserWindow>()
@@ -11,21 +12,22 @@ export function openReportWindow(
   reportId: string,
   parent: BrowserWindow | null
 ): BrowserWindow {
+  const report = reportRepository.get(reportId)
+  const title = formatReportWindowTitle(report?.name ?? 'Report')
+
   const existing = reportWindows.get(reportId)
   if (existing && !existing.isDestroyed()) {
+    existing.setTitle(title)
     existing.focus()
     return existing
   }
-
-  const report = reportRepository.get(reportId)
-  const title = report?.name ?? 'Report'
 
   const win = new BrowserWindow({
     width: 800,
     height: 560,
     minWidth: 480,
     minHeight: 320,
-    title: `Report — ${title}`,
+    title,
     icon: appIconPath(),
     backgroundColor: '#0d1117',
     parent: parent ?? undefined,

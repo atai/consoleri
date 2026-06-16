@@ -1,8 +1,9 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { appIconPath } from '../appBranding'
+import { APP_NAME, appIconPath } from '../appBranding'
 import { sessionManager } from '../sessions/SessionManager'
+import { formatSessionWindowTitle, joinWindowTitle } from '../windowTitles'
 
 const sessionWindows = new Map<string, BrowserWindow>()
 
@@ -17,13 +18,16 @@ export function openSessionWindow(
   parent: BrowserWindow | null
 ): BrowserWindow {
   const existing = getSessionWindow(sessionId)
+  const info = sessionManager.list().find((s) => s.id === sessionId)
+  const title = info
+    ? formatSessionWindowTitle(info)
+    : joinWindowTitle('Session', APP_NAME)
+
   if (existing) {
+    existing.setTitle(title)
     existing.focus()
     return existing
   }
-
-  const info = sessionManager.list().find((s) => s.id === sessionId)
-  const title = info?.title ?? 'Session'
 
   const win = new BrowserWindow({
     width: 960,
