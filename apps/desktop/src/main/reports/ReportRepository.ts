@@ -1,21 +1,16 @@
 import { nanoid } from 'nanoid'
-import { normalizeConnectivityTestResult, normalizeReportConfig } from '@consoleri/core'
-import type {
-  ConnectivityTestResult,
-  Report,
-  ReportInput,
-  ReportType
-} from '@consoleri/core'
+import { normalizeReportConfig, normalizeReportResult } from '@consoleri/core'
+import type { Report, ReportInput, ReportResult, ReportType } from '@consoleri/core'
 import { getDatabase } from '../db/database'
 
 function rowToReport(row: Record<string, unknown>): Report {
   const type = row.type as ReportType
   const config = normalizeReportConfig(type, JSON.parse((row.config_json as string) || '{}'))
   const lastResultRaw = row.last_result_json as string | null
-  let lastResult: ConnectivityTestResult | null = null
+  let lastResult: ReportResult | null = null
   if (lastResultRaw) {
     try {
-      lastResult = normalizeConnectivityTestResult(JSON.parse(lastResultRaw))
+      lastResult = normalizeReportResult(type, JSON.parse(lastResultRaw))
     } catch {
       lastResult = null
     }
@@ -81,7 +76,7 @@ export class ReportRepository {
     getDatabase().prepare('DELETE FROM reports WHERE id = ?').run(id)
   }
 
-  saveResult(id: string, result: ConnectivityTestResult): Report {
+  saveResult(id: string, result: ReportResult): Report {
     const existing = this.get(id)
     if (!existing) throw new Error(`Report not found: ${id}`)
 

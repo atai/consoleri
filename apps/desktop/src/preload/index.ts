@@ -23,7 +23,7 @@ import type {
   MapViewSettings,
   Report,
   ReportInput,
-  ConnectivityTestResult,
+  ReportResult,
   ReportProgressEvent
 } from '../shared/types'
 
@@ -135,7 +135,7 @@ export interface ConsoleriAPI {
     create: (input: ReportInput) => Promise<Report>
     update: (id: string, patch: Partial<ReportInput>) => Promise<Report>
     delete: (id: string) => Promise<void>
-    run: (reportId: string) => Promise<ConnectivityTestResult>
+    run: (reportId: string) => Promise<ReportResult>
     openWindow: (reportId: string) => Promise<void>
     onProgress: (cb: (event: ReportProgressEvent) => void) => () => void
     onUpdated: (cb: (report: Report) => void) => () => void

@@ -1,9 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS } from '../shared/types'
 import type {
-  ConnectivityTestResult,
   Report,
-  ReportProgressEvent
+  ReportProgressEvent,
+  ReportResult
 } from '../shared/types'
 
 const reportApi = {
@@ -13,7 +13,7 @@ const reportApi = {
   },
   getReport: (reportId: string): Promise<Report | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.reportsGet, reportId),
-  run: (reportId: string): Promise<ConnectivityTestResult> =>
+  run: (reportId: string): Promise<ReportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.reportsRun, reportId),
   onProgress: (cb: (event: ReportProgressEvent) => void): (() => void) => {
     const listener = (_: unknown, event: ReportProgressEvent) => cb(event)

@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { formatReportMarkdown, formatReportText } from './format'
+import {
+  formatReportMarkdown,
+  formatReportText,
+  summarizeReportResult,
+  totalReportDurationMs
+} from './format'
 import {
   normalizeConnectivityTestConfig,
   normalizeConnectivityTestResult,
-  normalizeReportConfig
+  normalizeInventoryConfig,
+  normalizeInventoryResult,
+  normalizeReportConfig,
+  normalizeReportResult
 } from './normalize'
 import type { Report } from './types'
 
-const sampleReport: Report = {
+const sampleConnectivityReport: Report = {
   id: 'r1',
   name: 'Prod check',
   type: 'connectivity_test',
@@ -24,7 +32,8 @@ const sampleReport: Report = {
   updatedAt: '2026-06-15T12:00:00.000Z'
 }
 
-const sampleResult = {
+const sampleConnectivityResult = {
+  type: 'connectivity_test' as const,
   runAt: '2026-06-15T12:00:00.000Z',
   entries: [
     { hostId: 'h1', profileId: 'p1', status: 'ok' as const, durationMs: 1200 },
@@ -73,11 +82,20 @@ describe('normalizeReportConfig', () => {
     expect(config.type).toBe('connectivity_test')
     expect(config.entries).toHaveLength(1)
   })
+
+  it('normalizes inventory config', () => {
+    const config = normalizeReportConfig('inventory', {
+      entries: [{ hostId: 'a', profileId: 'b' }]
+    })
+    expect(config.type).toBe('inventory')
+    expect(config.entries).toHaveLength(1)
+  })
 })
 
 describe('normalizeConnectivityTestResult', () => {
   it('parses valid result', () => {
-    const result = normalizeConnectivityTestResult(sampleResult)
+    const result = normalizeConnectivityTestResult(sampleConnectivityResult)
+    expect(result?.type).toBe('connectivity_test')
     expect(result?.entries).toHaveLength(2)
     expect(result?.entries[1]?.error).toBe('Connection timed out')
   })
@@ -85,11 +103,46 @@ describe('normalizeConnectivityTestResult', () => {
   it('returns null for invalid result', () => {
     expect(normalizeConnectivityTestResult({})).toBeNull()
   })
+
+  it('infers type from report type when missing', () => {
+    const legacy = {
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [{ hostId: 'h1', profileId: 'p1', status: 'ok', durationMs: 100 }]
+    }
+    const result = normalizeReportResult('connectivity_test', legacy)
+    expect(result?.type).toBe('connectivity_test')
+  })
+})
+
+describe('normalizeInventoryResult', () => {
+  it('parses valid inventory result', () => {
+    const result = normalizeInventoryResult({
+      type: 'inventory',
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [
+        {
+          hostId: 'h1',
+          profileId: 'p1',
+          status: 'ok',
+          durationMs: 500,
+          inventory: {
+            os: 'Ubuntu - 22.04.3 LTS',
+            ramBytes: 8589934592,
+            cpu: 'Intel Xeon (4 cores)',
+            hostnames: ['web-01', 'web-01.local'],
+            ipv4: ['10.0.0.1'],
+            ipv6: ['2001:db8::1']
+          }
+        }
+      ]
+    })
+    expect(result?.entries[0]?.inventory?.os).toBe('Ubuntu - 22.04.3 LTS')
+  })
 })
 
 describe('formatReportMarkdown', () => {
-  it('includes table and error section', () => {
-    const md = formatReportMarkdown(sampleReport, sampleResult, labels)
+  it('includes table and error section for connectivity', () => {
+    const md = formatReportMarkdown(sampleConnectivityReport, sampleConnectivityResult, labels)
     expect(md).toContain('# Prod check')
     expect(md).toContain('| web-01 | admin-key | OK |')
     expect(md).toContain('## Errors')
@@ -98,11 +151,29 @@ describe('formatReportMarkdown', () => {
 })
 
 describe('formatReportText', () => {
-  it('includes summary line', () => {
-    const text = formatReportText(sampleReport, sampleResult, labels)
+  it('includes summary line for connectivity', () => {
+    const text = formatReportText(sampleConnectivityReport, sampleConnectivityResult, labels)
     expect(text).toContain('[Connectivity test] Prod check')
     expect(text).toContain('✓ web-01')
     expect(text).toContain('✗ db-01')
     expect(text).toContain('Summary: 1 ok, 1 fail, 0 skipped')
+  })
+})
+
+describe('summarizeReportResult', () => {
+  it('summarizes connectivity result', () => {
+    expect(summarizeReportResult(sampleConnectivityResult)).toBe('1 ok, 1 fail, 0 skipped')
+  })
+})
+
+describe('totalReportDurationMs', () => {
+  it('sums entry durations', () => {
+    expect(totalReportDurationMs(sampleConnectivityResult.entries)).toBe(21200)
+  })
+})
+
+describe('normalizeInventoryConfig', () => {
+  it('returns empty entries for invalid input', () => {
+    expect(normalizeInventoryConfig(null)).toEqual({ type: 'inventory', entries: [] })
   })
 })

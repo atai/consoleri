@@ -1,21 +1,21 @@
 import type { Report } from '@shared/types'
 import { HostEntriesReportForm } from './HostEntriesReportForm'
 
-interface ConnectivityReportFormProps {
+interface InventoryReportFormProps {
   report?: Report
   onSave: () => void | Promise<void>
   onCancel: () => void
 }
 
-export function ConnectivityReportForm({
+export function InventoryReportForm({
   report,
   onSave,
   onCancel
-}: ConnectivityReportFormProps): React.JSX.Element {
+}: InventoryReportFormProps): React.JSX.Element {
   return (
     <HostEntriesReportForm
-      reportType="connectivity_test"
-      title={report ? 'Edit connectivity test' : 'New connectivity test'}
+      reportType="inventory"
+      title={report ? 'Edit inventory report' : 'New inventory report'}
       report={report}
       onSave={onSave}
       onCancel={onCancel}

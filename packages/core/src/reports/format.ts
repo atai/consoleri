@@ -1,111 +1,64 @@
-import type {
-  ConnectivityTestResult,
-  Report,
-  ReportFormatLabels
-} from './types'
+import type { Report, ReportFormatLabels, ReportResult } from './types'
+import {
+  formatConnectivityReportMarkdown,
+  formatConnectivityReportText,
+  summarizeConnectivityResult
+} from './formatConnectivity'
+import {
+  formatInventoryReportMarkdown,
+  formatInventoryReportText,
+  summarizeInventoryResult
+} from './formatInventory'
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'ok':
-      return 'OK'
-    case 'fail':
-      return 'FAIL'
-    case 'skipped':
-      return 'SKIPPED'
-    default:
-      return status.toUpperCase()
-  }
-}
-
-function formatRunTimestamp(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString()
-  } catch {
-    return iso
-  }
-}
+export { formatDuration, formatBytes, statusLabel, formatRunTimestamp, totalReportDurationMs } from './formatCommon'
+export {
+  formatConnectivityReportMarkdown,
+  formatConnectivityReportText,
+  summarizeConnectivityResult
+} from './formatConnectivity'
+export {
+  formatInventoryReportMarkdown,
+  formatInventoryReportText,
+  summarizeInventoryResult
+} from './formatInventory'
 
 export function formatReportMarkdown(
   report: Report,
-  result: ConnectivityTestResult,
+  result: ReportResult,
   labels: ReportFormatLabels
 ): string {
-  const lines: string[] = [
-    `# ${report.name}`,
-    '',
-    `**Type:** Connectivity test`,
-    `**Run at:** ${formatRunTimestamp(result.runAt)}`,
-    '',
-    '| Host | Profile | Status | Duration |',
-    '| --- | --- | --- | --- |'
-  ]
-
-  for (const entry of result.entries) {
-    const host = labels.hostName(entry.hostId)
-    const profile = labels.profileName(entry.profileId)
-    lines.push(
-      `| ${host} | ${profile} | ${statusLabel(entry.status)} | ${formatDuration(entry.durationMs)} |`
-    )
+  switch (result.type) {
+    case 'connectivity_test':
+      return formatConnectivityReportMarkdown(report, result, labels)
+    case 'inventory':
+      return formatInventoryReportMarkdown(report, result, labels)
+    default:
+      return formatConnectivityReportMarkdown(report, result as never, labels)
   }
-
-  const failures = result.entries.filter((e) => e.status === 'fail' || e.error)
-  if (failures.length > 0) {
-    lines.push('', '## Errors')
-    for (const entry of failures) {
-      const host = labels.hostName(entry.hostId)
-      lines.push('', `### ${host}`)
-      if (entry.error) {
-        lines.push('', '```', entry.error, '```')
-      }
-      if (entry.log && entry.log.length > 0) {
-        lines.push('', '```', ...entry.log, '```')
-      }
-    }
-  }
-
-  return lines.join('\n')
 }
 
 export function formatReportText(
   report: Report,
-  result: ConnectivityTestResult,
+  result: ReportResult,
   labels: ReportFormatLabels
 ): string {
-  const lines: string[] = [
-    `[Connectivity test] ${report.name} — ${formatRunTimestamp(result.runAt)}`,
-    '─'.repeat(48)
-  ]
-
-  for (const entry of result.entries) {
-    const host = labels.hostName(entry.hostId)
-    const profile = labels.profileName(entry.profileId)
-    const icon = entry.status === 'ok' ? '✓' : entry.status === 'skipped' ? '○' : '✗'
-    const padded = `${icon} ${host}  (${profile})`.padEnd(36)
-    lines.push(`${padded}${formatDuration(entry.durationMs).padStart(8)}`)
-
-    if (entry.status === 'fail' || entry.error) {
-      if (entry.error) {
-        lines.push(`  ERROR: ${entry.error}`)
-      }
-      if (entry.log && entry.log.length > 0) {
-        lines.push('  --- log ---')
-        for (const logLine of entry.log) {
-          lines.push(`  ${logLine}`)
-        }
-      }
-    }
+  switch (result.type) {
+    case 'connectivity_test':
+      return formatConnectivityReportText(report, result, labels)
+    case 'inventory':
+      return formatInventoryReportText(report, result, labels)
+    default:
+      return formatConnectivityReportText(report, result as never, labels)
   }
+}
 
-  const ok = result.entries.filter((e) => e.status === 'ok').length
-  const fail = result.entries.filter((e) => e.status === 'fail').length
-  const skipped = result.entries.filter((e) => e.status === 'skipped').length
-  lines.push('─'.repeat(48))
-  lines.push(`Summary: ${ok} ok, ${fail} fail, ${skipped} skipped`)
-
-  return lines.join('\n')
+export function summarizeReportResult(result: ReportResult): string {
+  switch (result.type) {
+    case 'connectivity_test':
+      return summarizeConnectivityResult(result)
+    case 'inventory':
+      return summarizeInventoryResult(result)
+    default:
+      return ''
+  }
 }

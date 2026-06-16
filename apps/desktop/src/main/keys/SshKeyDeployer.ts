@@ -13,42 +13,9 @@ import { credentialResolver, findSshProfile } from '../services/CredentialResolv
 import {
   connectSshClient,
   connectSshViaJump,
+  execSshCommand,
   toSshConnectConfig
 } from '../sessions/SshConnectHelper'
-
-const EXEC_TIMEOUT_MS = 30_000
-
-function execCommand(
-  client: Client,
-  command: string
-): Promise<{ code: number; stderr: string; stdout: string }> {
-  return new Promise((resolve, reject) => {
-    let stderr = ''
-    let stdout = ''
-    const timer = setTimeout(() => {
-      reject(new Error(`Remote command timed out after ${EXEC_TIMEOUT_MS / 1000}s`))
-    }, EXEC_TIMEOUT_MS)
-
-    client.exec(command, (err, stream) => {
-      if (err) {
-        clearTimeout(timer)
-        reject(err)
-        return
-      }
-
-      stream.on('data', (data: Buffer) => {
-        stdout += data.toString('utf8')
-      })
-      stream.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString('utf8')
-      })
-      stream.on('close', (code: number) => {
-        clearTimeout(timer)
-        resolve({ code: code ?? 0, stderr, stdout })
-      })
-    })
-  })
-}
 
 function readPublicKeyLine(keyPath: string): string {
   const pubPath = keyPath.endsWith('.pub') ? keyPath : publicKeyPathForPrivate(keyPath)
@@ -151,7 +118,7 @@ export class SshKeyDeployer {
     try {
       const command = buildAuthorizedKeysInstallCommand(pubkeyLine)
       log('debug', 'Running authorized_keys install command')
-      const { code, stderr, stdout } = await execCommand(client, command)
+      const { code, stderr, stdout } = await execSshCommand(client, command)
       if (stdout.trim()) log('debug', `stdout: ${stdout.trim()}`)
       if (stderr.trim()) log('warn', `stderr: ${stderr.trim()}`)
 

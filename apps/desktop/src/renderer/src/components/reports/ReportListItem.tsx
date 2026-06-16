@@ -1,3 +1,4 @@
+import { summarizeReportResult } from '@consoleri/core'
 import type { Report } from '@shared/types'
 
 interface ReportListItemProps {
@@ -7,12 +8,24 @@ interface ReportListItemProps {
   onDelete: () => void
 }
 
+function reportTypeLabel(type: Report['type']): string {
+  switch (type) {
+    case 'connectivity_test':
+      return 'Connectivity test'
+    case 'inventory':
+      return 'Inventory'
+    default:
+      return type
+  }
+}
+
+function hostCount(report: Report): number {
+  return report.config.entries.length
+}
+
 function summarizeResult(report: Report): string | null {
   if (!report.lastResult) return null
-  const ok = report.lastResult.entries.filter((e) => e.status === 'ok').length
-  const fail = report.lastResult.entries.filter((e) => e.status === 'fail').length
-  const skipped = report.lastResult.entries.filter((e) => e.status === 'skipped').length
-  return `${ok} ok, ${fail} fail${skipped > 0 ? `, ${skipped} skipped` : ''}`
+  return summarizeReportResult(report.lastResult)
 }
 
 export function ReportListItem({
@@ -21,23 +34,16 @@ export function ReportListItem({
   onEdit,
   onDelete
 }: ReportListItemProps): React.JSX.Element {
-  const hostCount =
-    report.config.type === 'connectivity_test' ? report.config.entries.length : 0
+  const hosts = hostCount(report)
   const summary = summarizeResult(report)
 
   return (
     <li className="flex items-center gap-2 border-b border-[#30363d] px-3 py-2 hover:bg-[#21262d]">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-w-0 flex-1 text-left"
-      >
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="truncate text-sm font-medium text-gray-100">{report.name}</div>
         <div className="mt-0.5 text-xs text-gray-500">
-          Connectivity test · {hostCount} host{hostCount === 1 ? '' : 's'}
-          {report.lastRunAt && (
-            <> · {new Date(report.lastRunAt).toLocaleString()}</>
-          )}
+          {reportTypeLabel(report.type)} · {hosts} host{hosts === 1 ? '' : 's'}
+          {report.lastRunAt && <> · {new Date(report.lastRunAt).toLocaleString()}</>}
           {summary && <> · {summary}</>}
         </div>
       </button>

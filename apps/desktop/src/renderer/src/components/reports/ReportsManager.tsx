@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Report } from '@shared/types'
+import type { Report, ReportType } from '@shared/types'
 import { ConnectivityReportForm } from './ConnectivityReportForm'
+import { InventoryReportForm } from './InventoryReportForm'
 import { ReportListItem } from './ReportListItem'
 
 export function ReportsManager(): React.JSX.Element {
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
+  const [creatingType, setCreatingType] = useState<ReportType | null>(null)
   const [editingReportId, setEditingReportId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
@@ -47,7 +48,7 @@ export function ReportsManager(): React.JSX.Element {
   }
 
   const handleSaved = async (): Promise<void> => {
-    setShowCreate(false)
+    setCreatingType(null)
     setEditingReportId(null)
     await refresh()
   }
@@ -55,6 +56,44 @@ export function ReportsManager(): React.JSX.Element {
   const editingReport = editingReportId
     ? reports.find((r) => r.id === editingReportId)
     : undefined
+
+  const renderCreateForm = (): React.JSX.Element | null => {
+    if (!creatingType) return null
+    if (creatingType === 'inventory') {
+      return (
+        <InventoryReportForm
+          onSave={() => void handleSaved()}
+          onCancel={() => setCreatingType(null)}
+        />
+      )
+    }
+    return (
+      <ConnectivityReportForm
+        onSave={() => void handleSaved()}
+        onCancel={() => setCreatingType(null)}
+      />
+    )
+  }
+
+  const renderEditForm = (): React.JSX.Element | null => {
+    if (!editingReport) return null
+    if (editingReport.type === 'inventory') {
+      return (
+        <InventoryReportForm
+          report={editingReport}
+          onSave={() => void handleSaved()}
+          onCancel={() => setEditingReportId(null)}
+        />
+      )
+    }
+    return (
+      <ConnectivityReportForm
+        report={editingReport}
+        onSave={() => void handleSaved()}
+        onCancel={() => setEditingReportId(null)}
+      />
+    )
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#161b22]">
@@ -70,41 +109,43 @@ export function ReportsManager(): React.JSX.Element {
           </button>
         </div>
         <p className="text-xs text-gray-500">
-          Saved host reports — run connectivity tests and export results
+          Saved host reports — connectivity tests, inventory collection, and export
         </p>
       </div>
 
-      <div className="shrink-0 border-b border-[#30363d] p-2">
+      <div className="shrink-0 flex gap-2 border-b border-[#30363d] p-2">
         <button
           type="button"
           onClick={() => {
-            setShowCreate(true)
+            setCreatingType('connectivity_test')
             setEditingReportId(null)
           }}
-          disabled={showCreate}
-          className="w-full rounded border border-dashed border-[#30363d] py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
+          disabled={creatingType !== null}
+          className="flex-1 rounded border border-dashed border-[#30363d] py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
         >
-          + Create connectivity test
+          + Connectivity test
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCreatingType('inventory')
+            setEditingReportId(null)
+          }}
+          disabled={creatingType !== null}
+          className="flex-1 rounded border border-dashed border-[#30363d] py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
+        >
+          + Inventory
         </button>
       </div>
 
-      {showCreate && (
-        <ConnectivityReportForm onSave={() => void handleSaved()} onCancel={() => setShowCreate(false)} />
-      )}
-
-      {editingReport && (
-        <ConnectivityReportForm
-          report={editingReport}
-          onSave={() => void handleSaved()}
-          onCancel={() => setEditingReportId(null)}
-        />
-      )}
+      {renderCreateForm()}
+      {renderEditForm()}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <p className="p-4 text-sm text-gray-500">Loading reports…</p>
         ) : reports.length === 0 ? (
-          <p className="p-4 text-sm text-gray-500">No reports yet. Create a connectivity test above.</p>
+          <p className="p-4 text-sm text-gray-500">No reports yet. Create a report above.</p>
         ) : (
           <ul>
             {reports.map((report) =>
@@ -115,7 +156,7 @@ export function ReportsManager(): React.JSX.Element {
                   onOpen={() => handleOpen(report)}
                   onEdit={() => {
                     setEditingReportId(report.id)
-                    setShowCreate(false)
+                    setCreatingType(null)
                   }}
                   onDelete={() => void handleDelete(report)}
                 />

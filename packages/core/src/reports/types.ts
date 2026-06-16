@@ -1,10 +1,25 @@
-export type ReportType = 'connectivity_test'
+export type ReportType = 'connectivity_test' | 'inventory'
 
-export type ConnectivityTestHostStatus = 'ok' | 'fail' | 'skipped'
+export type ReportHostStatus = 'ok' | 'fail' | 'skipped'
 
-export interface ConnectivityTestEntry {
+/** @deprecated Use ReportHostStatus */
+export type ConnectivityTestHostStatus = ReportHostStatus
+
+export interface ReportHostEntry {
   hostId: string
   profileId: string
+}
+
+export type ConnectivityTestEntry = ReportHostEntry
+export type InventoryEntry = ReportHostEntry
+
+export interface ReportHostResultBase {
+  hostId: string
+  profileId: string
+  status: ReportHostStatus
+  durationMs: number
+  error?: string
+  log?: string[]
 }
 
 export interface ConnectivityTestConfig {
@@ -12,21 +27,41 @@ export interface ConnectivityTestConfig {
   entries: ConnectivityTestEntry[]
 }
 
-export type ReportConfig = ConnectivityTestConfig
-
-export interface ConnectivityTestHostResult {
-  hostId: string
-  profileId: string
-  status: ConnectivityTestHostStatus
-  durationMs: number
-  error?: string
-  log?: string[]
+export interface InventoryConfig {
+  type: 'inventory'
+  entries: InventoryEntry[]
 }
 
+export type ReportConfig = ConnectivityTestConfig | InventoryConfig
+
+export interface ConnectivityTestHostResult extends ReportHostResultBase {}
+
 export interface ConnectivityTestResult {
+  type: 'connectivity_test'
   runAt: string
   entries: ConnectivityTestHostResult[]
 }
+
+export interface InventoryHostData {
+  os: string
+  ramBytes: number
+  cpu: string
+  hostnames: string[]
+  ipv4: string[]
+  ipv6: string[]
+}
+
+export interface InventoryHostResult extends ReportHostResultBase {
+  inventory?: InventoryHostData
+}
+
+export interface InventoryResult {
+  type: 'inventory'
+  runAt: string
+  entries: InventoryHostResult[]
+}
+
+export type ReportResult = ConnectivityTestResult | InventoryResult
 
 export interface Report {
   id: string
@@ -34,7 +69,7 @@ export interface Report {
   type: ReportType
   config: ReportConfig
   lastRunAt: string | null
-  lastResult: ConnectivityTestResult | null
+  lastResult: ReportResult | null
   createdAt: string
   updatedAt: string
 }
@@ -50,7 +85,7 @@ export interface ReportProgressEvent {
   index: number
   total: number
   hostId: string
-  status: ConnectivityTestHostStatus | 'running'
+  status: ReportHostStatus | 'running'
 }
 
 export interface ReportFormatLabels {
