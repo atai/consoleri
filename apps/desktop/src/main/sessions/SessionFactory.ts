@@ -1,4 +1,4 @@
-import { defaultPortForProtocol } from '@consoleri/core'
+import { buildRdpDestination, defaultPortForProtocol, resolveRdpPort } from '@consoleri/core'
 import type { ConnectionProfile, Host, OpenSessionRequest, Protocol } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import {
@@ -8,7 +8,7 @@ import {
 } from '../services/CredentialResolver'
 import { connectionLog, type ConnectionLog } from './ConnectionLog'
 import { PtySession } from './PtySession'
-import { RdpProxy, RdpSession } from './RdpProxy'
+import { RdpProxy, RdpSession } from './rdp/RdpProxy'
 import { SshSession } from './SshSession'
 import type { ITransport } from './Transport'
 import { VncProxy, VncSession } from './VncProxy'
@@ -18,6 +18,7 @@ export interface SessionTransportResult {
   protocol: Protocol
   title: string
   proxyUrl?: string
+  rdpDestination?: string
   rdpProxy?: RdpProxy
   vncProxy?: VncProxy
 }
@@ -114,14 +115,18 @@ export class SessionFactory {
       }
       case 'rdp': {
         const rdpProxy = new RdpProxy()
-        const rdpPort = (profile?.extra?.rdpPort as number) ?? defaultPortForProtocol('rdp')
-        this.log.append(sessionId, 'info', `Starting RDP proxy → ${host.hostname}:${rdpPort}`)
-        const proxy = await rdpProxy.start(host.hostname, rdpPort)
+        const rdpPort = resolveRdpPort(profile?.extra)
+        const rdpDestination = buildRdpDestination(host.hostname, rdpPort)
+        this.log.append(sessionId, 'info', `Starting RDP proxy → ${rdpDestination}`)
+        const proxy = await rdpProxy.start(host.hostname, rdpPort, (level, message) => {
+          this.log.append(sessionId, level, message)
+        })
         return {
           transport: new RdpSession(proxy.proxyUrl, rdpProxy),
           protocol,
           title,
           proxyUrl: proxy.proxyUrl,
+          rdpDestination,
           rdpProxy
         }
       }

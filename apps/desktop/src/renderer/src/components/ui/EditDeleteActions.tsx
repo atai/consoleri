@@ -4,7 +4,9 @@ import { ConfirmDeleteButton } from './ConfirmDeleteButton'
 export interface EditDeleteActionsProps {
   onEdit: () => void
   onDelete: () => void | Promise<void>
+  onCopy?: () => void
   editLabel?: string
+  copyLabel?: string
   deleteLabel?: string
   confirmDeleteLabel?: string
   disabled?: boolean
@@ -15,7 +17,9 @@ export interface EditDeleteActionsProps {
 export function EditDeleteActions({
   onEdit,
   onDelete,
+  onCopy,
   editLabel = 'Edit',
+  copyLabel = 'Copy',
   deleteLabel = 'Delete',
   confirmDeleteLabel = 'Delete',
   disabled = false,
@@ -27,6 +31,11 @@ export function EditDeleteActions({
       <Button variant="default" size="sm" disabled={disabled} onClick={onEdit}>
         {editLabel}
       </Button>
+      {onCopy && (
+        <Button variant="default" size="sm" disabled={disabled} onClick={onCopy}>
+          {copyLabel}
+        </Button>
+      )}
       <ConfirmDeleteButton
         label={deleteLabel}
         confirmLabel={confirmDeleteLabel}

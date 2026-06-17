@@ -11,6 +11,7 @@ import {
   connectSshViaJump,
   toSshConnectConfig
 } from '../sessions/SshConnectHelper'
+import { resolveReportHostProfile } from './resolveReportHostProfile'
 
 export type SshReportConnectSuccess = {
   ok: true
@@ -31,26 +32,17 @@ export class SshReportConnection {
   async connectForProfile(hostId: string, profileId: string): Promise<SshReportConnectResult> {
     const log: string[] = []
 
-    const host = hostRepository.getHost(hostId)
-    if (!host) {
+    const resolved = resolveReportHostProfile(hostId, profileId)
+    if (!resolved.ok) {
       return {
         ok: false,
         status: 'fail',
-        error: 'Host not found',
-        log: ['Host not found']
+        error: resolved.error,
+        log: resolved.log
       }
     }
 
-    const profiles = hostRepository.listProfiles(host.id)
-    const profile = profiles.find((p) => p.id === profileId)
-    if (!profile) {
-      return {
-        ok: false,
-        status: 'fail',
-        error: 'Profile not found for this host',
-        log: ['Profile not found for this host']
-      }
-    }
+    const { host, profile } = resolved
 
     if (profile.protocol !== 'ssh') {
       return {

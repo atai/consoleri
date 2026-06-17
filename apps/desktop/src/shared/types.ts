@@ -87,6 +87,7 @@ export interface SessionInfo {
   hostId: string | null
   profileId: string | null
   proxyUrl?: string
+  rdpDestination?: string
   error?: string
 }
 

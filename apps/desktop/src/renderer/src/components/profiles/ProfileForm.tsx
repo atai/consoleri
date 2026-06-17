@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { defaultPortForProtocol, isKeyFileRef, keyPathFromRef, makeKeyFileRef } from '@consoleri/core'
+import { defaultPortForProtocol, isKeyFileRef, keyPathFromRef, makeKeyFileRef, resolveRdpPort } from '@consoleri/core'
 import type { AuthMethod, ConnectionProfile, Host, ProfileInput, Protocol, SshKeyInfo } from '@shared/types'
-import { profileAuthLabel } from './profileDisplay'
-import { applyProfileTemplate } from './profileTemplate'
+import { profileAuthLabel, suggestProfileName } from './profileDisplay'
+import { applyProfileTemplate, profileInputFromTemplate } from './profileTemplate'
 import { PickProfileDialog } from './PickProfileDialog'
 
 const PROTOCOLS: Protocol[] = ['ssh', 'rdp', 'vnc', 'wsl']
@@ -14,6 +14,7 @@ interface ProfileFormProps {
   host?: Host
   hosts?: Host[]
   draft?: boolean
+  excludeProfileIds?: readonly string[]
   onDraftSave?: (input: ProfileInput) => void
   onSave: () => void
   onCancel: () => void
@@ -25,6 +26,7 @@ export function ProfileForm({
   host,
   hosts: hostsProp,
   draft = false,
+  excludeProfileIds,
   onDraftSave,
   onSave,
   onCancel
@@ -46,9 +48,7 @@ export function ProfileForm({
   const [sshKeys, setSshKeys] = useState<SshKeyInfo[]>([])
   const [shell, setShell] = useState(profile?.shell ?? '/bin/bash')
   const [jumpHostId, setJumpHostId] = useState(profile?.jumpHostId ?? '')
-  const [rdpPort, setRdpPort] = useState(
-    (profile?.extra?.rdpPort as number) ?? defaultPortForProtocol('rdp')
-  )
+  const [rdpPort, setRdpPort] = useState(resolveRdpPort(profile?.extra))
   const [vncPort, setVncPort] = useState(
     (profile?.extra?.vncPort as number) ?? defaultPortForProtocol('vnc')
   )
@@ -67,6 +67,33 @@ export function ProfileForm({
     window.consoleri.keys.list().then(setSshKeys)
   }, [])
 
+  useEffect(() => {
+    if (isEdit || name.trim() !== '') return
+    setName(
+      suggestProfileName({
+        username,
+        protocol,
+        authMethod,
+        jumpHostId,
+        hosts,
+        selectedKeyPath,
+        privateKey,
+        sshKeys
+      })
+    )
+  }, [
+    isEdit,
+    name,
+    username,
+    protocol,
+    authMethod,
+    jumpHostId,
+    hosts,
+    selectedKeyPath,
+    privateKey,
+    sshKeys
+  ])
+
   const supportsAuth = protocol === 'ssh' || protocol === 'rdp' || protocol === 'vnc'
   const jumpHostOptions = hosts.filter((h) => h.id !== linkHostId)
 
@@ -75,21 +102,51 @@ export function ProfileForm({
     if (path) setSelectedKeyPath(path)
   }
 
-  const handlePickProfile = (source: ConnectionProfile): void => {
-    const template = applyProfileTemplate(source)
-    setName(template.name)
-    setProtocol(template.protocol)
-    setUsername(template.username)
-    setAuthMethod(template.authMethod)
-    setShell(template.shell)
-    setJumpHostId(template.jumpHostId)
-    setRdpPort(template.rdpPort)
-    setVncPort(template.vncPort)
-    setSelectedKeyPath(template.selectedKeyPath)
-    setPassword('')
-    setPrivateKey('')
-    setCloneFromProfileId(template.cloneFromProfileId)
-    setShowPickDialog(false)
+  const handlePickProfile = async (sources: ConnectionProfile[]): Promise<void> => {
+    if (sources.length === 0) return
+
+    if (sources.length === 1) {
+      const template = applyProfileTemplate(sources[0]!)
+      setName(template.name)
+      setProtocol(template.protocol)
+      setUsername(template.username)
+      setAuthMethod(template.authMethod)
+      setShell(template.shell)
+      setJumpHostId(template.jumpHostId)
+      setRdpPort(template.rdpPort)
+      setVncPort(template.vncPort)
+      setSelectedKeyPath(template.selectedKeyPath)
+      setPassword('')
+      setPrivateKey('')
+      setCloneFromProfileId(template.cloneFromProfileId)
+      setShowPickDialog(false)
+      return
+    }
+
+    if (draft && onDraftSave) {
+      for (const source of sources) {
+        onDraftSave(profileInputFromTemplate(source))
+      }
+      onSave()
+      setShowPickDialog(false)
+      return
+    }
+
+    if (linkHostId) {
+      setSaving(true)
+      try {
+        for (const source of sources) {
+          await window.consoleri.profiles.create({
+            ...profileInputFromTemplate(source),
+            linkHostId
+          })
+        }
+        onSave()
+        setShowPickDialog(false)
+      } finally {
+        setSaving(false)
+      }
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
@@ -100,8 +157,21 @@ export function ProfileForm({
       if (protocol === 'rdp') extra.rdpPort = rdpPort
       if (protocol === 'vnc') extra.vncPort = vncPort
 
+      const resolvedName =
+        name.trim() ||
+        suggestProfileName({
+          username,
+          protocol,
+          authMethod,
+          jumpHostId,
+          hosts,
+          selectedKeyPath,
+          privateKey,
+          sshKeys
+        })
+
       const input: ProfileInput = {
-        name,
+        name: resolvedName,
         protocol,
         shell: protocol === 'ssh' || protocol === 'wsl' ? shell || null : null,
         username: username || null,
@@ -194,7 +264,6 @@ export function ProfileForm({
             className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            required
           />
         </label>
 
@@ -386,6 +455,7 @@ export function ProfileForm({
         <PickProfileDialog
           targetHostId={linkHostId}
           targetHostLabel={draft ? 'new host' : undefined}
+          excludeProfileIds={excludeProfileIds}
           onClose={() => setShowPickDialog(false)}
           onPick={handlePickProfile}
         />

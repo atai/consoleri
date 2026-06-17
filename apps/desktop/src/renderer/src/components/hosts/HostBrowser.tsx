@@ -6,6 +6,7 @@ import { HostActionsMenu } from './HostActionsMenu'
 import { HostForm } from './HostForm'
 import { HostDetailPanel } from './HostDetailPanel'
 import { HostListSection } from './HostListSection'
+import { pendingProfilesFromHost } from './hostTemplate'
 import { connectFromList, openLocalSessionFromList } from '../../session/connectHost'
 import { SessionOpenModeToggle } from './SessionOpenModeToggle'
 
@@ -31,6 +32,7 @@ function toolbarButtonClass(active: boolean): string {
 export function HostBrowser(): React.JSX.Element {
   const {
     hosts,
+    allHosts,
     allHostTags,
     groups,
     search,
@@ -61,6 +63,8 @@ export function HostBrowser(): React.JSX.Element {
   } = useAppStore()
 
   const [showForm, setShowForm] = useState(false)
+  const [copyFrom, setCopyFrom] = useState<Host | null>(null)
+  const [copyProfiles, setCopyProfiles] = useState<ConnectionProfile[]>([])
   const [editingHostId, setEditingHostId] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<ConnectionProfile[]>([])
   const [importJson, setImportJson] = useState('')
@@ -168,6 +172,23 @@ export function HostBrowser(): React.JSX.Element {
     setEditingHostId(hostId)
   }
 
+  const startCopyHost = async (hostId: string): Promise<void> => {
+    const host = hosts.find((h) => h.id === hostId) ?? allHosts.find((h) => h.id === hostId)
+    if (!host) return
+
+    const hostProfiles = await window.consoleri.profiles.list(hostId)
+    setCopyFrom(host)
+    setCopyProfiles(hostProfiles)
+    setEditingHostId(null)
+    setShowForm(true)
+  }
+
+  const closeHostForm = (): void => {
+    setShowForm(false)
+    setCopyFrom(null)
+    setCopyProfiles([])
+  }
+
   const selectedHost = hosts.find((h) => h.id === selectedHostId)
 
   return (
@@ -185,7 +206,11 @@ export function HostBrowser(): React.JSX.Element {
       <div className="shrink-0 border-b border-[#30363d]">
         <div className="flex items-center gap-2 px-2 py-1">
           <HostActionsMenu
-            onAddHost={() => setShowForm(true)}
+            onAddHost={() => {
+              setCopyFrom(null)
+              setCopyProfiles([])
+              setShowForm(true)
+            }}
             onImport={() => setShowImport(true)}
             onOpenPowerShell={() => openLocalShell('powershell')}
             onOpenBash={() => openLocalShell('bash')}
@@ -326,13 +351,17 @@ export function HostBrowser(): React.JSX.Element {
         {showForm && (
           <div className="border-b border-[#30363d]">
             <HostForm
+              copyFrom={copyFrom ?? undefined}
+              initialPendingProfiles={
+                copyFrom ? pendingProfilesFromHost(copyProfiles) : undefined
+              }
               onSave={() => {
-                setShowForm(false)
+                closeHostForm()
                 refreshHosts()
                 refreshAllHostTags()
-    refreshAllHosts()
+                refreshAllHosts()
               }}
-              onCancel={() => setShowForm(false)}
+              onCancel={closeHostForm}
             />
           </div>
         )}
@@ -352,6 +381,7 @@ export function HostBrowser(): React.JSX.Element {
               onSelect={setSelectedHostId}
               onConnect={connectHostHandler}
               onEdit={startEditHost}
+              onCopy={(hostId) => void startCopyHost(hostId)}
               onDelete={handleDeleteHost}
             />
           ))
@@ -368,6 +398,7 @@ export function HostBrowser(): React.JSX.Element {
           onDelete={handleDeleteHost}
           onAutoOpenLogChange={setAutoOpenConnectionLog}
           onEdit={() => startEditHost(selectedHost.id)}
+          onCopy={() => void startCopyHost(selectedHost.id)}
           onCancelEdit={() => setEditingHostId(null)}
           onHostUpdated={() => {
             refreshHosts()

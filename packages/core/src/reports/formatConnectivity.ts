@@ -1,6 +1,11 @@
 import type { ConnectivityTestResult, Report, ReportFormatLabels } from './types'
 import { formatDuration, formatRunTimestamp, statusLabel } from './formatCommon'
 
+function formatPingLabel(pingStatus: string | undefined): string {
+  if (!pingStatus) return '—'
+  return statusLabel(pingStatus)
+}
+
 export function formatConnectivityReportMarkdown(
   report: Report,
   result: ConnectivityTestResult,
@@ -12,26 +17,31 @@ export function formatConnectivityReportMarkdown(
     `**Type:** Connectivity test`,
     `**Run at:** ${formatRunTimestamp(result.runAt)}`,
     '',
-    '| Host | Profile | Status | Duration |',
-    '| --- | --- | --- | --- |'
+    '| Host | Profile | Ping | SSH | Duration |',
+    '| --- | --- | --- | --- | --- |'
   ]
 
   for (const entry of result.entries) {
     const host = labels.hostName(entry.hostId)
     const profile = labels.profileName(entry.profileId)
     lines.push(
-      `| ${host} | ${profile} | ${statusLabel(entry.status)} | ${formatDuration(entry.durationMs)} |`
+      `| ${host} | ${profile} | ${formatPingLabel(entry.pingStatus)} | ${statusLabel(entry.status)} | ${formatDuration(entry.durationMs)} |`
     )
   }
 
-  const failures = result.entries.filter((e) => e.status === 'fail' || e.error)
+  const failures = result.entries.filter(
+    (e) => e.status === 'fail' || e.pingStatus === 'fail' || e.error || e.pingError
+  )
   if (failures.length > 0) {
     lines.push('', '## Errors')
     for (const entry of failures) {
       const host = labels.hostName(entry.hostId)
       lines.push('', `### ${host}`)
+      if (entry.pingError) {
+        lines.push('', '**Ping:**', '```', entry.pingError, '```')
+      }
       if (entry.error) {
-        lines.push('', '```', entry.error, '```')
+        lines.push('', '**SSH:**', '```', entry.error, '```')
       }
       if (entry.log && entry.log.length > 0) {
         lines.push('', '```', ...entry.log, '```')
@@ -55,13 +65,17 @@ export function formatConnectivityReportText(
   for (const entry of result.entries) {
     const host = labels.hostName(entry.hostId)
     const profile = labels.profileName(entry.profileId)
-    const icon = entry.status === 'ok' ? '✓' : entry.status === 'skipped' ? '○' : '✗'
-    const padded = `${icon} ${host}  (${profile})`.padEnd(36)
+    const pingLabel = formatPingLabel(entry.pingStatus)
+    const sshLabel = statusLabel(entry.status)
+    const padded = `${host}  (${profile})  ping:${pingLabel} ssh:${sshLabel}`.padEnd(52)
     lines.push(`${padded}${formatDuration(entry.durationMs).padStart(8)}`)
 
+    if (entry.pingError) {
+      lines.push(`  PING ERROR: ${entry.pingError}`)
+    }
     if (entry.status === 'fail' || entry.error) {
       if (entry.error) {
-        lines.push(`  ERROR: ${entry.error}`)
+        lines.push(`  SSH ERROR: ${entry.error}`)
       }
       if (entry.log && entry.log.length > 0) {
         lines.push('  --- log ---')
@@ -69,21 +83,30 @@ export function formatConnectivityReportText(
           lines.push(`  ${logLine}`)
         }
       }
+    } else if (entry.pingStatus === 'fail' && entry.log && entry.log.length > 0) {
+      lines.push('  --- log ---')
+      for (const logLine of entry.log) {
+        lines.push(`  ${logLine}`)
+      }
     }
   }
 
+  const pingOk = result.entries.filter((e) => e.pingStatus === 'ok').length
+  const pingFail = result.entries.filter((e) => e.pingStatus === 'fail').length
   const ok = result.entries.filter((e) => e.status === 'ok').length
   const fail = result.entries.filter((e) => e.status === 'fail').length
   const skipped = result.entries.filter((e) => e.status === 'skipped').length
   lines.push('─'.repeat(48))
-  lines.push(`Summary: ${ok} ok, ${fail} fail, ${skipped} skipped`)
+  lines.push(`Summary: ping ${pingOk} ok, ${pingFail} fail | ssh ${ok} ok, ${fail} fail, ${skipped} skipped`)
 
   return lines.join('\n')
 }
 
 export function summarizeConnectivityResult(result: ConnectivityTestResult): string {
+  const pingOk = result.entries.filter((e) => e.pingStatus === 'ok').length
+  const pingFail = result.entries.filter((e) => e.pingStatus === 'fail').length
   const ok = result.entries.filter((e) => e.status === 'ok').length
   const fail = result.entries.filter((e) => e.status === 'fail').length
   const skipped = result.entries.filter((e) => e.status === 'skipped').length
-  return `${ok} ok, ${fail} fail, ${skipped} skipped`
+  return `ping ${pingOk}/${pingFail} | ssh ${ok} ok, ${fail} fail, ${skipped} skipped`
 }

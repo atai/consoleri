@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import type { ConnectivityTestHostResult, ConnectivityTestResult } from '@shared/types'
+import type { ConnectivityTestResult } from '@shared/types'
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -15,6 +15,11 @@ function statusBadge(status: string): string {
     default:
       return 'text-red-400'
   }
+}
+
+function formatPingStatus(pingStatus: string | undefined): string {
+  if (!pingStatus) return '—'
+  return pingStatus
 }
 
 interface ConnectivityResultsTableProps {
@@ -36,7 +41,8 @@ export function ConnectivityResultsTable({
         <tr className="border-b border-[#30363d] text-xs uppercase text-gray-500">
           <th className="px-3 py-2 font-medium">Host</th>
           <th className="px-3 py-2 font-medium">Profile</th>
-          <th className="px-3 py-2 font-medium">Status</th>
+          <th className="px-3 py-2 font-medium">Ping</th>
+          <th className="px-3 py-2 font-medium">SSH</th>
           <th className="px-3 py-2 font-medium">Duration</th>
           <th className="px-3 py-2 font-medium">Details</th>
         </tr>
@@ -44,11 +50,22 @@ export function ConnectivityResultsTable({
       <tbody>
         {result.entries.map((entry) => {
           const expanded = expandedHostId === entry.hostId
+          const hasDetails =
+            entry.error ||
+            entry.pingError ||
+            (entry.log && entry.log.length > 0)
           return (
             <Fragment key={`${entry.hostId}-${entry.profileId}`}>
               <tr className="border-b border-[#30363d]">
                 <td className="px-3 py-2 text-sm text-gray-200">{hostName(entry.hostId)}</td>
                 <td className="px-3 py-2 text-sm text-gray-400">{profileName(entry.profileId)}</td>
+                <td
+                  className={`px-3 py-2 text-sm font-medium uppercase ${
+                    entry.pingStatus ? statusBadge(entry.pingStatus) : 'text-gray-500'
+                  }`}
+                >
+                  {formatPingStatus(entry.pingStatus)}
+                </td>
                 <td
                   className={`px-3 py-2 text-sm font-medium uppercase ${statusBadge(entry.status)}`}
                 >
@@ -58,7 +75,7 @@ export function ConnectivityResultsTable({
                   {formatDuration(entry.durationMs)}
                 </td>
                 <td className="px-3 py-2 text-sm">
-                  {(entry.error || (entry.log && entry.log.length > 0)) && (
+                  {hasDetails && (
                     <button
                       type="button"
                       onClick={() => setExpandedHostId(expanded ? null : entry.hostId)}
@@ -69,11 +86,14 @@ export function ConnectivityResultsTable({
                   )}
                 </td>
               </tr>
-              {expanded && (entry.error || entry.log) && (
+              {expanded && hasDetails && (
                 <tr className="bg-[#161b22]">
-                  <td colSpan={5} className="px-3 py-2">
+                  <td colSpan={6} className="px-3 py-2">
+                    {entry.pingError && (
+                      <p className="mb-1 text-xs text-red-400">PING ERROR: {entry.pingError}</p>
+                    )}
                     {entry.error && (
-                      <p className="mb-1 text-xs text-red-400">ERROR: {entry.error}</p>
+                      <p className="mb-1 text-xs text-red-400">SSH ERROR: {entry.error}</p>
                     )}
                     {entry.log && entry.log.length > 0 && (
                       <pre className="overflow-x-auto whitespace-pre-wrap font-mono text-xs text-gray-400">

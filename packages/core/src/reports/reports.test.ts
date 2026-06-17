@@ -36,14 +36,24 @@ const sampleConnectivityResult = {
   type: 'connectivity_test' as const,
   runAt: '2026-06-15T12:00:00.000Z',
   entries: [
-    { hostId: 'h1', profileId: 'p1', status: 'ok' as const, durationMs: 1200 },
+    {
+      hostId: 'h1',
+      profileId: 'p1',
+      status: 'ok' as const,
+      durationMs: 1200,
+      pingStatus: 'ok' as const,
+      pingDurationMs: 45
+    },
     {
       hostId: 'h2',
       profileId: 'p2',
       status: 'fail' as const,
       durationMs: 20000,
+      pingStatus: 'fail' as const,
+      pingDurationMs: 3000,
+      pingError: 'Request timed out',
       error: 'Connection timed out',
-      log: ['Target: db.example:22', 'Connection failed: Connection timed out']
+      log: ['Ping target: db.example', 'Ping failed: Request timed out', 'Target: db.example:22', 'Connection failed: Connection timed out']
     }
   ]
 }
@@ -100,8 +110,34 @@ describe('normalizeConnectivityTestResult', () => {
     expect(result?.entries[1]?.error).toBe('Connection timed out')
   })
 
-  it('returns null for invalid result', () => {
-    expect(normalizeConnectivityTestResult({})).toBeNull()
+  it('parses ping fields', () => {
+    const result = normalizeConnectivityTestResult({
+      type: 'connectivity_test',
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [
+        {
+          hostId: 'h1',
+          profileId: 'p1',
+          status: 'ok',
+          durationMs: 100,
+          pingStatus: 'fail',
+          pingDurationMs: 50,
+          pingError: 'timeout'
+        }
+      ]
+    })
+    expect(result?.entries[0]?.pingStatus).toBe('fail')
+    expect(result?.entries[0]?.pingDurationMs).toBe(50)
+    expect(result?.entries[0]?.pingError).toBe('timeout')
+  })
+
+  it('omits invalid ping status from legacy results', () => {
+    const result = normalizeConnectivityTestResult({
+      type: 'connectivity_test',
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [{ hostId: 'h1', profileId: 'p1', status: 'ok', durationMs: 100 }]
+    })
+    expect(result?.entries[0]?.pingStatus).toBeUndefined()
   })
 
   it('infers type from report type when missing', () => {
@@ -144,9 +180,11 @@ describe('formatReportMarkdown', () => {
   it('includes table and error section for connectivity', () => {
     const md = formatReportMarkdown(sampleConnectivityReport, sampleConnectivityResult, labels)
     expect(md).toContain('# Prod check')
-    expect(md).toContain('| web-01 | admin-key | OK |')
+    expect(md).toContain('| Host | Profile | Ping | SSH | Duration |')
+    expect(md).toContain('| web-01 | admin-key | OK | OK |')
     expect(md).toContain('## Errors')
     expect(md).toContain('Connection timed out')
+    expect(md).toContain('Request timed out')
   })
 })
 
@@ -154,15 +192,17 @@ describe('formatReportText', () => {
   it('includes summary line for connectivity', () => {
     const text = formatReportText(sampleConnectivityReport, sampleConnectivityResult, labels)
     expect(text).toContain('[Connectivity test] Prod check')
-    expect(text).toContain('✓ web-01')
-    expect(text).toContain('✗ db-01')
-    expect(text).toContain('Summary: 1 ok, 1 fail, 0 skipped')
+    expect(text).toContain('ping:OK ssh:OK')
+    expect(text).toContain('ping:FAIL ssh:FAIL')
+    expect(text).toContain('Summary: ping 1 ok, 1 fail | ssh 1 ok, 1 fail, 0 skipped')
   })
 })
 
 describe('summarizeReportResult', () => {
   it('summarizes connectivity result', () => {
-    expect(summarizeReportResult(sampleConnectivityResult)).toBe('1 ok, 1 fail, 0 skipped')
+    expect(summarizeReportResult(sampleConnectivityResult)).toBe(
+      'ping 1/1 | ssh 1 ok, 1 fail, 0 skipped'
+    )
   })
 })
 

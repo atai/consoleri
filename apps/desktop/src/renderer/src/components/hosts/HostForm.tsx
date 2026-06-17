@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ConnectionProfile, Host, HostInput, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
 import { HOST_LOG_VERBOSITY_OPTIONS, parseTagsInput } from '@consoleri/core'
 import { useAppStore } from '../../stores/appStore'
@@ -6,14 +6,19 @@ import { ProfileForm } from '../profiles/ProfileForm'
 import { PickProfileDialog } from '../profiles/PickProfileDialog'
 import { TagInput } from './TagInput'
 import { HostProfilesSection } from '../profiles/HostProfilesSection'
+import { hostCopyName } from './hostTemplate'
 import {
   applyPendingProfiles,
+  mergePickedProfiles,
+  newPendingKey,
   pendingProfileLabel,
   type PendingProfile
 } from './pendingProfiles'
 
 interface HostFormProps {
   host?: Host
+  copyFrom?: Host
+  initialPendingProfiles?: PendingProfile[]
   profiles?: ConnectionProfile[]
   onProfilesChanged?: () => void
   onConnect?: (host: Host, profileId?: string) => void
@@ -23,12 +28,10 @@ interface HostFormProps {
 
 const OS_OPTIONS: OsType[] = ['windows', 'linux', 'macos', 'unknown']
 
-function newPendingKey(): string {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 12)
-}
-
 export function HostForm({
   host,
+  copyFrom,
+  initialPendingProfiles,
   profiles,
   onProfilesChanged,
   onConnect,
@@ -36,24 +39,31 @@ export function HostForm({
   onCancel
 }: HostFormProps): React.JSX.Element {
   const { allHostTags, allHosts, refreshAllHostTags, refreshAllHosts } = useAppStore()
-  const [name, setName] = useState(host?.name ?? '')
-  const [hostname, setHostname] = useState(host?.hostname ?? '')
-  const [port, setPort] = useState(host?.port ?? 22)
-  const [osType, setOsType] = useState<OsType>(host?.osType ?? 'linux')
-  const [tags, setTags] = useState(host?.tags.join(', ') ?? '')
-  const [notes, setNotes] = useState(host?.notes ?? '')
-  const [logVerbosity, setLogVerbosity] = useState<HostLogVerbosity>(host?.logVerbosity ?? 'info')
-  const [uxProfileId, setUxProfileId] = useState(host?.uxProfileId ?? '')
+  const source = host ?? copyFrom
+  const isCopyMode = Boolean(copyFrom)
+  const [name, setName] = useState(
+    host?.name ?? (copyFrom ? hostCopyName(copyFrom) : '')
+  )
+  const [hostname, setHostname] = useState(source?.hostname ?? '')
+  const [port, setPort] = useState(source?.port ?? 22)
+  const [osType, setOsType] = useState<OsType>(source?.osType ?? 'linux')
+  const [tags, setTags] = useState(source?.tags.join(', ') ?? '')
+  const [notes, setNotes] = useState(source?.notes ?? '')
+  const [logVerbosity, setLogVerbosity] = useState<HostLogVerbosity>(source?.logVerbosity ?? 'info')
+  const [uxProfileId, setUxProfileId] = useState(source?.uxProfileId ?? '')
   const [uxProfiles, setUxProfiles] = useState<UxProfile[]>([])
   const [saving, setSaving] = useState(false)
-  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>([])
+  const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>(
+    initialPendingProfiles ?? []
+  )
   const [showAddProfile, setShowAddProfile] = useState(false)
   const [showPickDialog, setShowPickDialog] = useState(false)
-  const [relatedHostIds, setRelatedHostIds] = useState<string[]>(host?.relatedHostIds ?? [])
-  const [gatewayHostId, setGatewayHostId] = useState(host?.gatewayHostId ?? '')
+  const [relatedHostIds, setRelatedHostIds] = useState<string[]>(source?.relatedHostIds ?? [])
+  const [gatewayHostId, setGatewayHostId] = useState(source?.gatewayHostId ?? '')
 
-  const otherHosts = allHosts.filter((h) => h.id !== host?.id)
-  const gatewayOptions = otherHosts.filter((h) => h.gatewayHostId !== host?.id)
+  const excludeHostId = host?.id ?? copyFrom?.id
+  const otherHosts = allHosts.filter((h) => h.id !== excludeHostId)
+  const gatewayOptions = otherHosts.filter((h) => h.gatewayHostId !== excludeHostId)
 
   useEffect(() => {
     void window.consoleri.uxProfiles.list().then(setUxProfiles)
@@ -75,7 +85,8 @@ export function HostForm({
         logVerbosity,
         uxProfileId: uxProfileId || null,
         relatedHostIds,
-        gatewayHostId: gatewayHostId || null
+        gatewayHostId: gatewayHostId || null,
+        groupId: copyFrom?.groupId ?? null
       }
 
       if (host) {
@@ -83,6 +94,18 @@ export function HostForm({
       } else {
         const savedHost = await window.consoleri.hosts.create(input)
         await applyPendingProfiles(pendingProfiles, savedHost.id)
+
+        const sourceDefaultProfileId = copyFrom?.defaultProfileId
+        if (sourceDefaultProfileId) {
+          const linkedProfileIds = new Set(
+            pendingProfiles.flatMap((p) => (p.kind === 'picked' ? [p.profile.id] : []))
+          )
+          if (linkedProfileIds.has(sourceDefaultProfileId)) {
+            await window.consoleri.hosts.update(savedHost.id, {
+              defaultProfileId: sourceDefaultProfileId
+            })
+          }
+        }
       }
       onSave()
     } finally {
@@ -91,14 +114,34 @@ export function HostForm({
   }
 
   const handleDraftProfile = (input: ProfileInput): void => {
-    setPendingProfiles((prev) => [...prev, { key: newPendingKey(), kind: 'new', input }])
+    setPendingProfiles((prev) => {
+      if (
+        input.cloneFromProfileId &&
+        prev.some(
+          (p) => p.kind === 'new' && p.input.cloneFromProfileId === input.cloneFromProfileId
+        )
+      ) {
+        return prev
+      }
+      return [...prev, { key: newPendingKey(), kind: 'new', input }]
+    })
     setShowAddProfile(false)
   }
 
-  const handlePickProfile = (profile: ConnectionProfile): void => {
-    setPendingProfiles((prev) => [...prev, { key: newPendingKey(), kind: 'picked', profile }])
+  const handlePickProfile = (profiles: ConnectionProfile[]): void => {
+    setPendingProfiles((prev) => mergePickedProfiles(prev, profiles))
     setShowPickDialog(false)
   }
+
+  const excludeProfileIds = useMemo(
+    () =>
+      pendingProfiles.flatMap((p) => {
+        if (p.kind === 'picked') return [p.profile.id]
+        if (p.input.cloneFromProfileId) return [p.input.cloneFromProfileId]
+        return []
+      }),
+    [pendingProfiles]
+  )
 
   const removePending = (key: string): void => {
     setPendingProfiles((prev) => prev.filter((p) => p.key !== key))
@@ -107,7 +150,11 @@ export function HostForm({
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-3 p-4 text-sm">
-        {!host && <h3 className="text-base font-medium text-gray-200">Add host</h3>}
+        {!host && (
+          <h3 className="text-base font-medium text-gray-200">
+            {isCopyMode ? 'Copy host' : 'Add host'}
+          </h3>
+        )}
         <label className="block">
           <span className="text-gray-400">Name</span>
           <input
@@ -167,7 +214,7 @@ export function HostForm({
           </select>
         </label>
 
-        {host && (
+        {(host || isCopyMode) && (
           <label className="block">
             <span className="text-gray-400">UX profile</span>
             <select
@@ -215,6 +262,7 @@ export function HostForm({
               <div className="mb-2 rounded border border-[#30363d] bg-[#0d1117]">
                 <ProfileForm
                   draft
+                  excludeProfileIds={excludeProfileIds}
                   onDraftSave={handleDraftProfile}
                   onSave={() => setShowAddProfile(false)}
                   onCancel={() => setShowAddProfile(false)}
@@ -257,7 +305,7 @@ export function HostForm({
           />
         </label>
 
-        {host && otherHosts.length > 0 && (
+        {(host || isCopyMode) && otherHosts.length > 0 && (
           <div className="block">
             <span className="text-gray-400">Related hosts</span>
             <div className="mt-1 max-h-28 overflow-y-auto rounded border border-[#30363d] bg-[#0d1117] p-2">
@@ -279,7 +327,7 @@ export function HostForm({
           </div>
         )}
 
-        {host && (
+        {(host || isCopyMode) && (
           <label className="block">
             <span className="text-gray-400">Gateway host</span>
             <select
@@ -337,6 +385,7 @@ export function HostForm({
       {showPickDialog && !host && (
         <PickProfileDialog
           targetHostLabel={name.trim() || 'new host'}
+          excludeProfileIds={excludeProfileIds}
           onClose={() => setShowPickDialog(false)}
           onPick={handlePickProfile}
         />

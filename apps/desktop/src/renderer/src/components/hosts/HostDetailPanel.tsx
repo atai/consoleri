@@ -18,6 +18,7 @@ interface HostDetailPanelProps {
   onDelete: (hostId: string) => void | Promise<void>
   onAutoOpenLogChange: (value: boolean) => void
   onEdit: () => void
+  onCopy: () => void
   onCancelEdit: () => void
   onHostUpdated: () => void
   onProfilesChanged: () => void
@@ -32,6 +33,7 @@ export function HostDetailPanel({
   onDelete,
   onAutoOpenLogChange,
   onEdit,
+  onCopy,
   onCancelEdit,
   onHostUpdated,
   onProfilesChanged
@@ -75,6 +77,7 @@ export function HostDetailPanel({
         <EditDeleteActions
           resetKey={host.id}
           onEdit={onEdit}
+          onCopy={onCopy}
           onDelete={() => onDelete(host.id)}
         />
         </div>

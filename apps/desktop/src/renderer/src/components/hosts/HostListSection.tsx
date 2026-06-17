@@ -11,6 +11,7 @@ export interface HostListSectionProps {
   onSelect: (hostId: string) => void
   onConnect: (host: Host) => void
   onEdit: (hostId: string) => void
+  onCopy: (hostId: string) => void
   onDelete: (hostId: string) => void | Promise<void>
 }
 
@@ -24,6 +25,7 @@ export function HostListSection({
   onSelect,
   onConnect,
   onEdit,
+  onCopy,
   onDelete
 }: HostListSectionProps): React.JSX.Element {
   if (hosts.length === 0) {
@@ -41,6 +43,7 @@ export function HostListSection({
             onSelect={() => onSelect(host.id)}
             onConnect={() => onConnect(host)}
             onEdit={() => onEdit(host.id)}
+            onCopy={() => onCopy(host.id)}
             onDelete={() => onDelete(host.id)}
           />
         ))}
@@ -75,6 +78,7 @@ export function HostListSection({
               onSelect={() => onSelect(host.id)}
               onConnect={() => onConnect(host)}
               onEdit={() => onEdit(host.id)}
+              onCopy={() => onCopy(host.id)}
               onDelete={() => onDelete(host.id)}
             />
           ))}

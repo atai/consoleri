@@ -1,44 +1,41 @@
 import { createServer, type Server as HttpServer } from 'http'
-import net from 'net'
 import { WebSocketServer, type WebSocket } from 'ws'
-import { BaseTransport } from './Transport'
-
-export interface RdpProxyInfo {
-  proxyUrl: string
-  port: number
-}
+import { BaseTransport } from '../Transport'
+import { RdpCleanPathHandler } from './RdpCleanPathHandler'
+import { nodeRdpHandshake } from './nodeRdpHandshake'
+import { nodeRdpRelay } from './nodeRdpRelay'
+import type { AllowedTarget, RdpLogFn, RdpProxyInfo } from './types'
 
 export class RdpProxy {
   private httpServer: HttpServer | null = null
   private wss: WebSocketServer | null = null
   private port = 0
+  private allowedTarget: AllowedTarget | null = null
+  private log: RdpLogFn | null = null
 
-  async start(host: string, port = 3389): Promise<RdpProxyInfo> {
+  async start(host: string, port = 3389, log?: RdpLogFn): Promise<RdpProxyInfo> {
+    this.allowedTarget = { host, port }
+    this.log = log ?? null
+
     return new Promise((resolve, reject) => {
       this.httpServer = createServer()
       this.wss = new WebSocketServer({ server: this.httpServer })
 
       this.wss.on('connection', (ws: WebSocket) => {
-        const tcpSocket = net.createConnection({ host, port }, () => {
-          ws.on('message', (data) => {
-            if (tcpSocket.writable) {
-              tcpSocket.write(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer))
-            }
-          })
-          tcpSocket.on('data', (chunk) => {
-            if (ws.readyState === ws.OPEN) ws.send(chunk)
-          })
-          tcpSocket.on('close', () => ws.close())
-          tcpSocket.on('error', (err) => {
-            ws.close()
-            this.emitError(err)
-          })
-          ws.on('close', () => tcpSocket.destroy())
-        })
-        tcpSocket.on('error', (err) => {
+        if (!this.allowedTarget) {
           ws.close()
-          reject(err)
+          return
+        }
+
+        this.log?.('info', 'RDP WebSocket client connected')
+
+        const handler = new RdpCleanPathHandler({
+          allowedTarget: this.allowedTarget,
+          handshake: nodeRdpHandshake,
+          relay: nodeRdpRelay,
+          log: this.log ?? undefined
         })
+        handler.handleConnection(ws)
       })
 
       this.httpServer.listen(0, '127.0.0.1', () => {
@@ -53,15 +50,13 @@ export class RdpProxy {
     })
   }
 
-  private emitError(_err: Error): void {
-    /* logged by session manager */
-  }
-
   stop(): void {
     this.wss?.close()
     this.httpServer?.close()
     this.wss = null
     this.httpServer = null
+    this.allowedTarget = null
+    this.log = null
   }
 }
 
@@ -88,3 +83,5 @@ export class RdpSession extends BaseTransport {
     this.proxy.stop()
   }
 }
+
+export type { RdpProxyInfo } from './types'

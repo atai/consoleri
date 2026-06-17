@@ -14,7 +14,7 @@ import {
   buildLogicalGraph,
   buildNetworkGraph,
   layoutDagreGraph,
-  layoutForceGraph,
+  layoutLogicalGraph,
   layoutCenterToTopLeft,
   type MapGraphEdge
 } from '@consoleri/core'
@@ -66,7 +66,7 @@ export function HostMapCanvas({ hosts }: HostMapCanvasProps): React.JSX.Element 
     const graph = mapMode === 'logical' ? buildLogicalGraph(hosts) : buildNetworkGraph(hosts)
     const positioned =
       mapMode === 'logical'
-        ? layoutForceGraph(graph, width, height)
+        ? layoutLogicalGraph(graph, width, height)
         : layoutDagreGraph(graph)
 
     const flowNodes: Node[] = positioned.map((n) => {

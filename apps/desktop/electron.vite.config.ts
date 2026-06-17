@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { ironrdpWasmPlugin } from './src/renderer/plugins/ironrdpWasmPlugin'
 
 const coreSrc = resolve(__dirname, '../../packages/core/src')
 
@@ -39,7 +40,7 @@ export default defineConfig({
         '@consoleri/core': coreSrc
       }
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [ironrdpWasmPlugin(__dirname), react(), tailwindcss()],
     optimizeDeps: {
       exclude: ['ironrdp-wasm']
     },

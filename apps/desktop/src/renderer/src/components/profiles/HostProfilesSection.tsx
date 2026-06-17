@@ -34,8 +34,8 @@ export function HostProfilesSection({
     onProfilesChanged()
   }
 
-  const handlePick = async (source: ConnectionProfile): Promise<void> => {
-    await window.consoleri.profiles.link(host.id, source.id)
+  const handlePick = async (sources: ConnectionProfile[]): Promise<void> => {
+    await Promise.all(sources.map((source) => window.consoleri.profiles.link(host.id, source.id)))
     onProfilesChanged()
   }
 

@@ -18,6 +18,7 @@ export interface HostListItemProps {
   onSelect: () => void
   onConnect: () => void
   onEdit: () => void
+  onCopy: () => void
   onDelete: () => void | Promise<void>
 }
 
@@ -27,6 +28,7 @@ export function HostListItem({
   onSelect,
   onConnect,
   onEdit,
+  onCopy,
   onDelete
 }: HostListItemProps): React.JSX.Element {
   return (
@@ -64,7 +66,7 @@ export function HostListItem({
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
-        <EditDeleteActions resetKey={host.id} onEdit={onEdit} onDelete={onDelete} />
+        <EditDeleteActions resetKey={host.id} onEdit={onEdit} onCopy={onCopy} onDelete={onDelete} />
       </div>
     </li>
   )

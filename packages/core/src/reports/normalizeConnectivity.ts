@@ -1,7 +1,8 @@
 import type {
   ConnectivityTestConfig,
   ConnectivityTestHostResult,
-  ConnectivityTestResult
+  ConnectivityTestResult,
+  ReportHostStatus
 } from './types'
 import {
   isNonEmptyString,
@@ -20,8 +21,28 @@ export function normalizeConnectivityTestConfig(input: unknown): ConnectivityTes
   }
 }
 
+function normalizePingStatus(value: unknown): ReportHostStatus | undefined {
+  if (value === 'ok' || value === 'fail') return value
+  return undefined
+}
+
 function normalizeConnectivityHostResult(raw: unknown): ConnectivityTestHostResult | null {
-  return normalizeHostResultBase(raw)
+  const base = normalizeHostResultBase(raw)
+  if (!base) return null
+
+  const entry = raw as Partial<ConnectivityTestHostResult>
+  const result: ConnectivityTestHostResult = { ...base }
+
+  const pingStatus = normalizePingStatus(entry.pingStatus)
+  if (pingStatus) result.pingStatus = pingStatus
+
+  if (typeof entry.pingDurationMs === 'number' && entry.pingDurationMs >= 0) {
+    result.pingDurationMs = entry.pingDurationMs
+  }
+
+  if (isNonEmptyString(entry.pingError)) result.pingError = entry.pingError
+
+  return result
 }
 
 export function normalizeConnectivityTestResult(input: unknown): ConnectivityTestResult | null {

@@ -8,7 +8,7 @@ import { credentialVault } from '../hosts/CredentialVault'
 import { connectionLog } from './ConnectionLog'
 import { sessionFactory } from './SessionFactory'
 import type { ITransport } from './Transport'
-import { RdpProxy } from './RdpProxy'
+import { RdpProxy } from './rdp/RdpProxy'
 import { VncProxy } from './VncProxy'
 import { formatSessionWindowTitle } from '../windowTitles'
 
@@ -170,6 +170,7 @@ export class SessionManager {
       managed.info.protocol = result.protocol
       managed.info.title = result.title
       managed.info.proxyUrl = result.proxyUrl
+      managed.info.rdpDestination = result.rdpDestination
       managed.info.status = 'connected'
       managed.connecting = false
 
@@ -215,6 +216,7 @@ export class SessionManager {
       existing.info.protocol = result.protocol
       existing.info.title = result.title
       existing.info.proxyUrl = result.proxyUrl
+      existing.info.rdpDestination = result.rdpDestination
       existing.info.status = 'connected'
       existing.connecting = false
 

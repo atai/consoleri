@@ -62,9 +62,11 @@ export function ProfileManager(): React.JSX.Element {
     await refresh()
   }
 
-  const handlePick = async (source: ConnectionProfile): Promise<void> => {
+  const handlePick = async (sources: ConnectionProfile[]): Promise<void> => {
     if (!hostFilter) return
-    await window.consoleri.profiles.link(hostFilter, source.id)
+    await Promise.all(
+      sources.map((source) => window.consoleri.profiles.link(hostFilter, source.id))
+    )
     await refresh()
   }
 

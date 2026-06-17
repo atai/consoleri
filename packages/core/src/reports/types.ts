@@ -34,7 +34,11 @@ export interface InventoryConfig {
 
 export type ReportConfig = ConnectivityTestConfig | InventoryConfig
 
-export interface ConnectivityTestHostResult extends ReportHostResultBase {}
+export interface ConnectivityTestHostResult extends ReportHostResultBase {
+  pingStatus?: ReportHostStatus
+  pingDurationMs?: number
+  pingError?: string
+}
 
 export interface ConnectivityTestResult {
   type: 'connectivity_test'
