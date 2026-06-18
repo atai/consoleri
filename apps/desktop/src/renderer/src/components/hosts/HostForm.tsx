@@ -259,6 +259,10 @@ export function HostForm({
                 </option>
               ))}
             </select>
+            <span className="mt-1 block text-xs text-gray-500">
+              Controls terminal colors and shell prompt style. Edit the profile to change Shell prompt
+              (Consoleri vs server).
+            </span>
           </label>
         )}
 

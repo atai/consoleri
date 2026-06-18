@@ -1,6 +1,7 @@
 import net from 'node:net'
 import { Client, type ConnectConfig } from 'ssh2'
-import { defaultPortForProtocol, sshDebugEnabled } from '@consoleri/core'
+import { defaultPortForProtocol, resolveRemoteShellInvoke, sshDebugEnabled } from '@consoleri/core'
+import type { ShellPromptMode } from '@consoleri/core'
 import type { ConnectionProfile, Host } from '../../shared/types'
 import type { ResolvedCredentials } from '../services/CredentialResolver'
 import { BaseTransport } from './Transport'
@@ -16,6 +17,7 @@ export interface SshConnectOptions {
   rows: number
   log: ConnectionLog
   sessionId: string
+  shellPrompt?: ShellPromptMode
 }
 
 interface ConnectConfigOptions {
@@ -118,8 +120,18 @@ export class SshSession extends BaseTransport {
   }
 
   private async connect(options: SshConnectOptions): Promise<void> {
-    const { host, profile, credentials, jumpHost, jumpCredentials, cols, rows, log, sessionId } =
-      options
+    const {
+      host,
+      profile,
+      credentials,
+      jumpHost,
+      jumpCredentials,
+      cols,
+      rows,
+      log,
+      sessionId,
+      shellPrompt = 'consoleri'
+    } = options
 
     log.append(sessionId, 'info', `Connecting SSH to ${host.hostname}:${host.port || 22}`)
     log.append(sessionId, 'debug', `Profile: ${profile.name}, user: ${credentials.username}`)
@@ -151,13 +163,21 @@ export class SshSession extends BaseTransport {
       })
     }
 
-    const shellCmd = profile.shell || undefined
-    log.append(sessionId, 'info', shellCmd ? `Opening shell: ${shellCmd}` : 'Opening interactive shell')
+    const shellInvoke = resolveRemoteShellInvoke(profile.shell, {
+      promptFallback: shellPrompt === 'consoleri'
+    })
+    log.append(
+      sessionId,
+      'info',
+      shellInvoke.mode === 'default'
+        ? 'Opening interactive shell'
+        : `Opening shell: ${shellInvoke.command}`
+    )
 
+    const pty = { rows, cols, term: 'xterm-256color' as const }
     const stream = await new Promise<import('ssh2').ClientChannel>((resolve, reject) => {
-      const pty = { rows, cols, term: 'xterm-256color' }
-      if (shellCmd) {
-        this.client!.exec(shellCmd, { pty }, (err, s) => {
+      if (shellInvoke.mode === 'exec') {
+        this.client!.exec(shellInvoke.command, { pty }, (err, s) => {
           if (err) reject(err)
           else resolve(s)
         })

@@ -46,7 +46,7 @@ export function ProfileForm({
     return null
   })
   const [sshKeys, setSshKeys] = useState<SshKeyInfo[]>([])
-  const [shell, setShell] = useState(profile?.shell ?? '/bin/bash')
+  const [shell, setShell] = useState(profile?.shell ?? '')
   const [jumpHostId, setJumpHostId] = useState(profile?.jumpHostId ?? '')
   const [rdpPort, setRdpPort] = useState(resolveRdpPort(profile?.extra))
   const [vncPort, setVncPort] = useState(
@@ -173,7 +173,7 @@ export function ProfileForm({
       const input: ProfileInput = {
         name: resolvedName,
         protocol,
-        shell: protocol === 'ssh' || protocol === 'wsl' ? shell || null : null,
+        shell: protocol === 'ssh' || protocol === 'wsl' ? shell.trim() || null : null,
         username: username || null,
         authMethod: supportsAuth ? authMethod : 'none',
         jumpHostId: protocol === 'ssh' && jumpHostId ? jumpHostId : null,
@@ -375,8 +375,12 @@ export function ProfileForm({
               className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
               value={shell}
               onChange={(e) => setShell(e.target.value)}
-              placeholder="/bin/bash"
+              placeholder="Server default (recommended)"
             />
+            <span className="mt-1 block text-xs text-gray-500">
+              Leave empty to use the user&apos;s login shell. Specify a path only when a specific shell
+              is required.
+            </span>
           </label>
         )}
 

@@ -21,12 +21,15 @@ export interface TerminalTheme {
   brightWhite: string
 }
 
+export type ShellPromptMode = 'server' | 'consoleri'
+
 export interface TerminalAppearance {
   fontSize: number
   fontFamily: string
   cursorBlink: boolean
   scrollback: number
   theme: TerminalTheme
+  shellPrompt: ShellPromptMode
 }
 
 export interface ChromeAppearance {

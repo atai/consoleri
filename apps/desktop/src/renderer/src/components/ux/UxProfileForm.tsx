@@ -7,7 +7,7 @@ import {
   TERMINAL_THEME_KEYS,
   normalizeUxProfileInput
 } from '@consoleri/core'
-import type { TerminalTheme, UxProfile, UxProfileInput } from '@consoleri/core'
+import type { ShellPromptMode, TerminalTheme, UxProfile, UxProfileInput } from '@consoleri/core'
 import { UxProfilePreview } from './UxProfilePreview'
 
 interface UxProfileFormProps {
@@ -35,6 +35,9 @@ export function UxProfileForm({ profile, onSave, onCancel }: UxProfileFormProps)
   const [scrollback, setScrollback] = useState(
     profile?.terminal.scrollback ?? DEFAULT_TERMINAL_APPEARANCE.scrollback
   )
+  const [shellPrompt, setShellPrompt] = useState<ShellPromptMode>(
+    profile?.terminal.shellPrompt ?? DEFAULT_TERMINAL_APPEARANCE.shellPrompt
+  )
   const [sidebarWidth, setSidebarWidth] = useState(
     profile?.chrome.sidebarWidth ?? DEFAULT_CHROME_APPEARANCE.sidebarWidth
   )
@@ -47,10 +50,10 @@ export function UxProfileForm({ profile, onSave, onCancel }: UxProfileFormProps)
   const draftInput = useMemo<UxProfileInput>(
     () => ({
       name,
-      terminal: { fontSize, fontFamily, cursorBlink, scrollback, theme },
+      terminal: { fontSize, fontFamily, cursorBlink, scrollback, theme, shellPrompt },
       chrome: { sidebarWidth }
     }),
-    [name, fontSize, fontFamily, cursorBlink, scrollback, theme, sidebarWidth]
+    [name, fontSize, fontFamily, cursorBlink, scrollback, theme, sidebarWidth, shellPrompt]
   )
 
   const previewAppearance = useMemo(
@@ -120,6 +123,21 @@ export function UxProfileForm({ profile, onSave, onCancel }: UxProfileFormProps)
           />
         </label>
       </div>
+
+      <label className="block">
+        <span className="text-gray-400">Shell prompt</span>
+        <select
+          className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
+          value={shellPrompt}
+          onChange={(e) => setShellPrompt(e.target.value as ShellPromptMode)}
+        >
+          <option value="consoleri">Consoleri (user@host:path)</option>
+          <option value="server">Server only</option>
+        </select>
+        <span className="mt-1 block text-xs text-gray-500">
+          Consoleri supplies a colored prompt when the server has no PS1 configured.
+        </span>
+      </label>
 
       <label className="block">
         <span className="text-gray-400">Font family</span>

@@ -24,7 +24,7 @@ export function applyProfileTemplate(
     protocol: source.protocol,
     username: source.username ?? '',
     authMethod: source.authMethod,
-    shell: source.shell ?? '/bin/bash',
+    shell: source.shell ?? '',
     jumpHostId: source.jumpHostId ?? '',
     rdpPort: resolveRdpPort(source.extra),
     vncPort: (source.extra.vncPort as number) ?? defaultPortForProtocol('vnc'),

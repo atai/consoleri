@@ -1,6 +1,7 @@
-import { buildRdpDestination, defaultPortForProtocol, resolveRdpPort } from '@consoleri/core'
+import { buildRdpDestination, defaultPortForProtocol, resolveRdpPort, resolveUxProfile } from '@consoleri/core'
 import type { ConnectionProfile, Host, OpenSessionRequest, Protocol } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
+import { uxProfileRepository } from '../ux/UxProfileRepository'
 import {
   credentialResolver,
   findSshProfile,
@@ -100,6 +101,10 @@ export class SessionFactory {
           if (!jumpProfile) throw new Error('Jump host has no SSH profile')
           jumpCredentials = await credentialResolver.resolveForProfile(jumpProfile)
         }
+        const uxProfile = resolveUxProfile(uxProfileRepository.list(), {
+          hostUxProfileId: host.uxProfileId,
+          activeUxProfileId: uxProfileRepository.getActive().id
+        })
         const transport = await SshSession.create({
           host,
           profile,
@@ -109,7 +114,8 @@ export class SessionFactory {
           cols,
           rows,
           log: this.log,
-          sessionId
+          sessionId,
+          shellPrompt: uxProfile.terminal.shellPrompt
         })
         return { transport, protocol, title }
       }

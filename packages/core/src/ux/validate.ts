@@ -55,7 +55,8 @@ export function normalizeTerminalAppearance(
       100,
       50000
     ),
-    theme: normalizeTerminalTheme(input?.theme, base.theme)
+    theme: normalizeTerminalTheme(input?.theme, base.theme),
+    shellPrompt: input?.shellPrompt === 'server' ? 'server' : base.shellPrompt
   }
 }
 

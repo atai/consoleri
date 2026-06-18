@@ -48,7 +48,8 @@ export function UxProfileListItem({
             )}
           </div>
           <p className="mt-0.5 text-xs text-gray-500">
-            {hostLine} · {profile.terminal.fontSize}px · scrollback {profile.terminal.scrollback}
+            {hostLine} · {profile.terminal.fontSize}px · scrollback {profile.terminal.scrollback} ·
+            prompt {profile.terminal.shellPrompt === 'server' ? 'server' : 'Consoleri'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">

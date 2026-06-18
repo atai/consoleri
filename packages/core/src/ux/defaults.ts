@@ -29,7 +29,8 @@ export const DEFAULT_TERMINAL_APPEARANCE: TerminalAppearance = {
   fontFamily: 'Consolas, "Cascadia Mono", "Courier New", monospace',
   cursorBlink: true,
   scrollback: 10000,
-  theme: DEFAULT_TERMINAL_THEME
+  theme: DEFAULT_TERMINAL_THEME,
+  shellPrompt: 'consoleri'
 }
 
 export const MIN_SIDEBAR_WIDTH = 360

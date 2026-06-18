@@ -23,6 +23,14 @@ describe('normalizeTerminalAppearance', () => {
     expect(result.theme.background).toBe(DEFAULT_TERMINAL_APPEARANCE.theme.background)
     expect(result.theme.foreground).toBe('#aabbcc')
   })
+
+  it('defaults shell prompt to consoleri', () => {
+    expect(normalizeTerminalAppearance({}).shellPrompt).toBe('consoleri')
+    expect(normalizeTerminalAppearance({ shellPrompt: 'server' }).shellPrompt).toBe('server')
+    expect(normalizeTerminalAppearance({ shellPrompt: 'invalid' as 'server' }).shellPrompt).toBe(
+      'consoleri'
+    )
+  })
 })
 
 describe('normalizeChromeAppearance', () => {
