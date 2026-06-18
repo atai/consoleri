@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { isKeyFileRef, normalizeHostLogVerbosity, normalizeGatewayHostId, normalizeRelatedHostIds, rowToHost, rowToProfile } from '@consoleri/core'
+import { isKeyFileRef, normalizeHostLogVerbosity, normalizeGatewayHostId, normalizeHttpEndpoint, normalizeRelatedHostIds, rowToHost, rowToProfile } from '@consoleri/core'
 import type {
   ConnectionProfile,
   Host,
@@ -67,9 +67,10 @@ export class HostRepository {
     const existingIds = this.existingHostIdSet()
     const relatedHostIds = normalizeRelatedHostIds(id, input.relatedHostIds, existingIds)
     const gatewayHostId = normalizeGatewayHostId(id, input.gatewayHostId ?? null, this.existingHostsForGateway())
+    const httpEndpoint = normalizeHttpEndpoint(input.httpEndpoint)
     db.prepare(
-      `INSERT INTO hosts (id, name, hostname, port, os_type, tags_json, group_id, notes, default_profile_id, ux_profile_id, log_verbosity, related_hosts_json, gateway_host_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO hosts (id, name, hostname, port, os_type, tags_json, group_id, notes, default_profile_id, ux_profile_id, log_verbosity, related_hosts_json, gateway_host_id, http_endpoint, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.name,
@@ -84,6 +85,7 @@ export class HostRepository {
       normalizeHostLogVerbosity(input.logVerbosity),
       JSON.stringify(relatedHostIds),
       gatewayHostId,
+      httpEndpoint,
       now,
       now
     )
@@ -103,9 +105,13 @@ export class HostRepository {
       input.gatewayHostId !== undefined
         ? normalizeGatewayHostId(id, input.gatewayHostId, this.existingHostsForGateway())
         : existing.gatewayHostId
+    const httpEndpoint =
+      input.httpEndpoint !== undefined
+        ? normalizeHttpEndpoint(input.httpEndpoint)
+        : existing.httpEndpoint
     getDatabase()
       .prepare(
-        `UPDATE hosts SET name=?, hostname=?, port=?, os_type=?, tags_json=?, group_id=?, notes=?, default_profile_id=?, ux_profile_id=?, log_verbosity=?, related_hosts_json=?, gateway_host_id=?, updated_at=? WHERE id=?`
+        `UPDATE hosts SET name=?, hostname=?, port=?, os_type=?, tags_json=?, group_id=?, notes=?, default_profile_id=?, ux_profile_id=?, log_verbosity=?, related_hosts_json=?, gateway_host_id=?, http_endpoint=?, updated_at=? WHERE id=?`
       )
       .run(
         input.name ?? existing.name,
@@ -122,6 +128,7 @@ export class HostRepository {
           : existing.logVerbosity,
         JSON.stringify(relatedHostIds),
         gatewayHostId,
+        httpEndpoint,
         now,
         id
       )

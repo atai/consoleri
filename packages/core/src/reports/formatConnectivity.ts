@@ -1,5 +1,9 @@
 import type { ConnectivityTestResult, Report, ReportFormatLabels } from './types'
 import { formatDuration, formatRunTimestamp, statusLabel } from './formatCommon'
+import {
+  connectivityResultHasHttpColumn,
+  formatHttpStatusLabel
+} from './httpStatusColor'
 
 function formatPingLabel(pingStatus: string | undefined): string {
   if (!pingStatus) return '—'
@@ -11,26 +15,39 @@ export function formatConnectivityReportMarkdown(
   result: ConnectivityTestResult,
   labels: ReportFormatLabels
 ): string {
+  const showHttp = connectivityResultHasHttpColumn(result.entries)
   const lines: string[] = [
     `# ${report.name}`,
     '',
     `**Type:** Connectivity test`,
     `**Run at:** ${formatRunTimestamp(result.runAt)}`,
     '',
-    '| Host | Profile | Ping | SSH | Duration |',
-    '| --- | --- | --- | --- | --- |'
+    showHttp
+      ? '| Host | Profile | Ping | SSH | HTTP | Duration |'
+      : '| Host | Profile | Ping | SSH | Duration |',
+    showHttp
+      ? '| --- | --- | --- | --- | --- | --- |'
+      : '| --- | --- | --- | --- | --- |'
   ]
 
   for (const entry of result.entries) {
     const host = labels.hostName(entry.hostId)
     const profile = labels.profileName(entry.profileId)
+    const httpLabel = formatHttpStatusLabel(entry.httpStatusCode, entry.httpError)
     lines.push(
-      `| ${host} | ${profile} | ${formatPingLabel(entry.pingStatus)} | ${statusLabel(entry.status)} | ${formatDuration(entry.durationMs)} |`
+      showHttp
+        ? `| ${host} | ${profile} | ${formatPingLabel(entry.pingStatus)} | ${statusLabel(entry.status)} | ${httpLabel} | ${formatDuration(entry.durationMs)} |`
+        : `| ${host} | ${profile} | ${formatPingLabel(entry.pingStatus)} | ${statusLabel(entry.status)} | ${formatDuration(entry.durationMs)} |`
     )
   }
 
   const failures = result.entries.filter(
-    (e) => e.status === 'fail' || e.pingStatus === 'fail' || e.error || e.pingError
+    (e) =>
+      e.status === 'fail' ||
+      e.pingStatus === 'fail' ||
+      e.error ||
+      e.pingError ||
+      e.httpError
   )
   if (failures.length > 0) {
     lines.push('', '## Errors')
@@ -39,6 +56,9 @@ export function formatConnectivityReportMarkdown(
       lines.push('', `### ${host}`)
       if (entry.pingError) {
         lines.push('', '**Ping:**', '```', entry.pingError, '```')
+      }
+      if (entry.httpError) {
+        lines.push('', '**HTTP:**', '```', entry.httpError, '```')
       }
       if (entry.error) {
         lines.push('', '**SSH:**', '```', entry.error, '```')
@@ -57,6 +77,7 @@ export function formatConnectivityReportText(
   result: ConnectivityTestResult,
   labels: ReportFormatLabels
 ): string {
+  const showHttp = connectivityResultHasHttpColumn(result.entries)
   const lines: string[] = [
     `[Connectivity test] ${report.name} — ${formatRunTimestamp(result.runAt)}`,
     '─'.repeat(48)
@@ -67,11 +88,17 @@ export function formatConnectivityReportText(
     const profile = labels.profileName(entry.profileId)
     const pingLabel = formatPingLabel(entry.pingStatus)
     const sshLabel = statusLabel(entry.status)
-    const padded = `${host}  (${profile})  ping:${pingLabel} ssh:${sshLabel}`.padEnd(52)
+    const httpLabel = showHttp
+      ? ` http:${formatHttpStatusLabel(entry.httpStatusCode, entry.httpError)}`
+      : ''
+    const padded = `${host}  (${profile})  ping:${pingLabel} ssh:${sshLabel}${httpLabel}`.padEnd(52)
     lines.push(`${padded}${formatDuration(entry.durationMs).padStart(8)}`)
 
     if (entry.pingError) {
       lines.push(`  PING ERROR: ${entry.pingError}`)
+    }
+    if (entry.httpError) {
+      lines.push(`  HTTP ERROR: ${entry.httpError}`)
     }
     if (entry.status === 'fail' || entry.error) {
       if (entry.error) {

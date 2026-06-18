@@ -17,6 +17,7 @@ describe('rowToHost', () => {
       log_verbosity: 'info',
       related_hosts_json: '["db"]',
       gateway_host_id: 'gw1',
+      http_endpoint: 'https://alb.example/health',
       created_at: '2024-01-01',
       updated_at: '2024-01-02'
     })
@@ -25,6 +26,7 @@ describe('rowToHost', () => {
     expect(host.logVerbosity).toBe('info')
     expect(host.relatedHostIds).toEqual(['db'])
     expect(host.gatewayHostId).toBe('gw1')
+    expect(host.httpEndpoint).toBe('https://alb.example/health')
   })
 })
 

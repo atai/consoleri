@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ConnectionProfile, Host, HostInput, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
-import { HOST_LOG_VERBOSITY_OPTIONS, parseTagsInput } from '@consoleri/core'
+import { HOST_LOG_VERBOSITY_OPTIONS, normalizeHttpEndpoint, parseTagsInput } from '@consoleri/core'
 import { useAppStore } from '../../stores/appStore'
 import { ProfileForm } from '../profiles/ProfileForm'
 import { PickProfileDialog } from '../profiles/PickProfileDialog'
@@ -45,6 +45,7 @@ export function HostForm({
     host?.name ?? (copyFrom ? hostCopyName(copyFrom) : '')
   )
   const [hostname, setHostname] = useState(source?.hostname ?? '')
+  const [httpEndpoint, setHttpEndpoint] = useState(source?.httpEndpoint ?? '')
   const [port, setPort] = useState(source?.port ?? 22)
   const [osType, setOsType] = useState<OsType>(source?.osType ?? 'linux')
   const [tags, setTags] = useState(source?.tags.join(', ') ?? '')
@@ -53,6 +54,7 @@ export function HostForm({
   const [uxProfileId, setUxProfileId] = useState(source?.uxProfileId ?? '')
   const [uxProfiles, setUxProfiles] = useState<UxProfile[]>([])
   const [saving, setSaving] = useState(false)
+  const [httpEndpointError, setHttpEndpointError] = useState<string | null>(null)
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>(
     initialPendingProfiles ?? []
   )
@@ -73,6 +75,14 @@ export function HostForm({
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
+    setHttpEndpointError(null)
+    let normalizedHttpEndpoint: string | null
+    try {
+      normalizedHttpEndpoint = normalizeHttpEndpoint(httpEndpoint)
+    } catch (err) {
+      setHttpEndpointError(err instanceof Error ? err.message : String(err))
+      return
+    }
     setSaving(true)
     try {
       const input: HostInput = {
@@ -86,6 +96,7 @@ export function HostForm({
         uxProfileId: uxProfileId || null,
         relatedHostIds,
         gatewayHostId: gatewayHostId || null,
+        httpEndpoint: normalizedHttpEndpoint,
         groupId: copyFrom?.groupId ?? null
       }
 
@@ -172,6 +183,25 @@ export function HostForm({
             onChange={(e) => setHostname(e.target.value)}
             required
           />
+        </label>
+        <label className="block">
+          <span className="text-gray-400">HTTP Endpoint</span>
+          <input
+            type="url"
+            className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
+            value={httpEndpoint}
+            onChange={(e) => {
+              setHttpEndpoint(e.target.value)
+              if (httpEndpointError) setHttpEndpointError(null)
+            }}
+            placeholder="https://alb.example/health"
+          />
+          <span className="mt-1 block text-xs text-gray-500">
+            Optional. For HTTP(S) traffic through ALB terminating on this host.
+          </span>
+          {httpEndpointError && (
+            <span className="mt-1 block text-xs text-red-400">{httpEndpointError}</span>
+          )}
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">

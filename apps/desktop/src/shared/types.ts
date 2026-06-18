@@ -3,7 +3,7 @@ export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, ReportProgressEvent } from '@consoleri/core'
+export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, CustomTestConfig, CustomTestEntry, CustomTestCommand, CustomTestResult, CustomTestHostResult, CustomTestCommandResult, ReportProgressEvent } from '@consoleri/core'
 import type { HostLogVerbosity } from '@consoleri/core'
 
 export interface LogEntry {
@@ -36,6 +36,7 @@ export interface Host {
   logVerbosity: HostLogVerbosity
   relatedHostIds: string[]
   gatewayHostId: string | null
+  httpEndpoint: string | null
   createdAt: string
   updatedAt: string
 }
@@ -119,6 +120,7 @@ export interface HostInput {
   logVerbosity?: HostLogVerbosity
   relatedHostIds?: string[]
   gatewayHostId?: string | null
+  httpEndpoint?: string | null
 }
 
 export interface ProfileInput {

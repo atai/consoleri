@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Report, ReportType } from '@shared/types'
 import { ConnectivityReportForm } from './ConnectivityReportForm'
+import { CustomTestReportForm } from './CustomTestReportForm'
 import { InventoryReportForm } from './InventoryReportForm'
 import { ReportListItem } from './ReportListItem'
 
@@ -67,6 +68,14 @@ export function ReportsManager(): React.JSX.Element {
         />
       )
     }
+    if (creatingType === 'custom_test') {
+      return (
+        <CustomTestReportForm
+          onSave={() => void handleSaved()}
+          onCancel={() => setCreatingType(null)}
+        />
+      )
+    }
     return (
       <ConnectivityReportForm
         onSave={() => void handleSaved()}
@@ -80,6 +89,15 @@ export function ReportsManager(): React.JSX.Element {
     if (editingReport.type === 'inventory') {
       return (
         <InventoryReportForm
+          report={editingReport}
+          onSave={() => void handleSaved()}
+          onCancel={() => setEditingReportId(null)}
+        />
+      )
+    }
+    if (editingReport.type === 'custom_test') {
+      return (
+        <CustomTestReportForm
           report={editingReport}
           onSave={() => void handleSaved()}
           onCancel={() => setEditingReportId(null)}
@@ -109,7 +127,7 @@ export function ReportsManager(): React.JSX.Element {
           </button>
         </div>
         <p className="text-xs text-gray-500">
-          Saved host reports — connectivity tests, inventory collection, and export
+          Saved host reports — connectivity tests, inventory, custom tests, and export
         </p>
       </div>
 
@@ -135,6 +153,17 @@ export function ReportsManager(): React.JSX.Element {
           className="flex-1 rounded border border-dashed border-[#30363d] py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
         >
           + Inventory
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCreatingType('custom_test')
+            setEditingReportId(null)
+          }}
+          disabled={creatingType !== null}
+          className="flex-1 rounded border border-dashed border-[#30363d] py-2 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
+        >
+          + Custom test
         </button>
       </div>
 

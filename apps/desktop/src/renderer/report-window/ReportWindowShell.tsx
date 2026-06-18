@@ -8,6 +8,8 @@ function reportTypeLabel(type: Report['type']): string {
       return 'Connectivity test'
     case 'inventory':
       return 'Inventory'
+    case 'custom_test':
+      return 'Custom test'
     default:
       return type
   }
@@ -19,6 +21,8 @@ function progressActionLabel(type: Report['type']): string {
       return 'Testing'
     case 'inventory':
       return 'Collecting'
+    case 'custom_test':
+      return 'Running'
     default:
       return 'Processing'
   }
@@ -111,8 +115,11 @@ export function ReportWindowShell({
           <div className="mt-3">
             <div className="mb-1 flex justify-between text-xs text-gray-500">
               <span>
-                {progressActionLabel(report.type)} {labels.hostName(progress.hostId)} (
-                {progress.index + 1}/{progress.total})
+                {progressActionLabel(report.type)} {labels.hostName(progress.hostId)}
+                {progress.commandIndex != null && progress.commandTotal != null && (
+                  <> · command {progress.commandIndex + 1}/{progress.commandTotal}</>
+                )}{' '}
+                (host {progress.index + 1}/{progress.total})
               </span>
               <span>{progressPercent}%</span>
             </div>

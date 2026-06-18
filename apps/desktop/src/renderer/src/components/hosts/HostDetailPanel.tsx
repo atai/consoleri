@@ -73,6 +73,9 @@ export function HostDetailPanel({
           <div className="truncate text-xs text-gray-500">
             {host.hostname}:{host.port}
           </div>
+          {host.httpEndpoint && (
+            <div className="truncate text-xs text-gray-500">{host.httpEndpoint}</div>
+          )}
         </div>
         <EditDeleteActions
           resetKey={host.id}

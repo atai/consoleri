@@ -14,6 +14,8 @@ function reportTypeLabel(type: Report['type']): string {
       return 'Connectivity test'
     case 'inventory':
       return 'Inventory'
+    case 'custom_test':
+      return 'Custom test'
     default:
       return type
   }

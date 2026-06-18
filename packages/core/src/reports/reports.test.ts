@@ -131,6 +131,51 @@ describe('normalizeConnectivityTestResult', () => {
     expect(result?.entries[0]?.pingError).toBe('timeout')
   })
 
+  it('parses http fields', () => {
+    const result = normalizeConnectivityTestResult({
+      type: 'connectivity_test',
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [
+        {
+          hostId: 'h1',
+          profileId: 'p1',
+          status: 'ok',
+          durationMs: 100,
+          httpStatusCode: 200,
+          httpDurationMs: 80
+        },
+        {
+          hostId: 'h2',
+          profileId: 'p2',
+          status: 'ok',
+          durationMs: 100,
+          httpError: 'fetch failed',
+          httpDurationMs: 10000
+        }
+      ]
+    })
+    expect(result?.entries[0]?.httpStatusCode).toBe(200)
+    expect(result?.entries[0]?.httpDurationMs).toBe(80)
+    expect(result?.entries[1]?.httpError).toBe('fetch failed')
+  })
+
+  it('omits invalid http status code', () => {
+    const result = normalizeConnectivityTestResult({
+      type: 'connectivity_test',
+      runAt: '2026-06-15T12:00:00.000Z',
+      entries: [
+        {
+          hostId: 'h1',
+          profileId: 'p1',
+          status: 'ok',
+          durationMs: 100,
+          httpStatusCode: 999
+        }
+      ]
+    })
+    expect(result?.entries[0]?.httpStatusCode).toBeUndefined()
+  })
+
   it('omits invalid ping status from legacy results', () => {
     const result = normalizeConnectivityTestResult({
       type: 'connectivity_test',
@@ -185,6 +230,24 @@ describe('formatReportMarkdown', () => {
     expect(md).toContain('## Errors')
     expect(md).toContain('Connection timed out')
     expect(md).toContain('Request timed out')
+  })
+
+  it('includes HTTP column when http results exist', () => {
+    const md = formatReportMarkdown(
+      sampleConnectivityReport,
+      {
+        ...sampleConnectivityResult,
+        entries: [
+          {
+            ...sampleConnectivityResult.entries[0],
+            httpStatusCode: 200
+          }
+        ]
+      },
+      labels
+    )
+    expect(md).toContain('| Host | Profile | Ping | SSH | HTTP | Duration |')
+    expect(md).toContain('| 200 |')
   })
 })
 

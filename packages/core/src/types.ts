@@ -18,6 +18,7 @@ export interface Host {
   logVerbosity: HostLogVerbosity
   relatedHostIds: string[]
   gatewayHostId: string | null
+  httpEndpoint: string | null
   createdAt: string
   updatedAt: string
 }

@@ -1,8 +1,10 @@
 import type { ReportConfig, ReportResult, ReportType } from './types'
 import { normalizeConnectivityTestConfig, normalizeConnectivityTestResult } from './normalizeConnectivity'
+import { normalizeCustomTestConfig, normalizeCustomTestResult } from './normalizeCustomTest'
 import { normalizeInventoryConfig, normalizeInventoryResult } from './normalizeInventory'
 
 export { normalizeConnectivityTestConfig, normalizeConnectivityTestResult } from './normalizeConnectivity'
+export { normalizeCustomTestConfig, normalizeCustomTestResult } from './normalizeCustomTest'
 export { normalizeInventoryConfig, normalizeInventoryResult } from './normalizeInventory'
 export { isNonEmptyString, normalizeHostEntry, normalizeHostEntries } from './normalizeCommon'
 
@@ -12,6 +14,8 @@ export function normalizeReportConfig(type: ReportType, input: unknown): ReportC
       return normalizeConnectivityTestConfig(input)
     case 'inventory':
       return normalizeInventoryConfig(input)
+    case 'custom_test':
+      return normalizeCustomTestConfig(input)
     default:
       return normalizeConnectivityTestConfig(input)
   }
@@ -27,6 +31,8 @@ export function normalizeReportResult(type: ReportType, input: unknown): ReportR
       return normalizeConnectivityTestResult(input)
     case 'inventory':
       return normalizeInventoryResult(input)
+    case 'custom_test':
+      return normalizeCustomTestResult(input)
     default:
       return normalizeConnectivityTestResult(input)
   }

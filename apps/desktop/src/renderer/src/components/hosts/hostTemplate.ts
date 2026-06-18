@@ -18,7 +18,8 @@ export function hostInputFromCopy(source: Host): HostInput {
     uxProfileId: source.uxProfileId,
     logVerbosity: source.logVerbosity,
     relatedHostIds: [...source.relatedHostIds],
-    gatewayHostId: source.gatewayHostId
+    gatewayHostId: source.gatewayHostId,
+    httpEndpoint: source.httpEndpoint
   }
 }
 

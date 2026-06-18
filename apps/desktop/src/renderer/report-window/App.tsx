@@ -8,6 +8,7 @@ import type {
   ReportResult
 } from '@shared/types'
 import { ConnectivityResultsTable } from './ConnectivityResultsTable'
+import { CustomTestResultsTable } from './CustomTestResultsTable'
 import { InventoryResultsTable } from './InventoryResultsTable'
 import { ReportWindowShell } from './ReportWindowShell'
 
@@ -31,6 +32,8 @@ function emptyResultMessage(type: Report['type']): string {
       return 'No results yet. Click "Generate" to run the connectivity test.'
     case 'inventory':
       return 'No results yet. Click "Generate" to collect inventory data.'
+    case 'custom_test':
+      return 'No results yet. Click "Generate" to run the custom test.'
     default:
       return 'No results yet. Click "Generate" to run the report.'
   }
@@ -141,6 +144,7 @@ export function ReportWindowApp(): React.JSX.Element {
         return (
           <ConnectivityResultsTable
             result={result}
+            hostById={hostById}
             hostName={labels.hostName}
             profileName={labels.profileName}
           />
@@ -148,6 +152,14 @@ export function ReportWindowApp(): React.JSX.Element {
       case 'inventory':
         return (
           <InventoryResultsTable
+            result={result}
+            hostName={labels.hostName}
+            profileName={labels.profileName}
+          />
+        )
+      case 'custom_test':
+        return (
+          <CustomTestResultsTable
             result={result}
             hostName={labels.hostName}
             profileName={labels.profileName}
@@ -167,7 +179,11 @@ export function ReportWindowApp(): React.JSX.Element {
       error={error}
       copyFeedback={copyFeedback}
       canCopy={result !== null}
-      canRun={report.config.entries.length > 0}
+      canRun={
+        report.config.entries.length > 0 &&
+        (report.type !== 'custom_test' ||
+          (report.config.type === 'custom_test' && report.config.commands.length > 0))
+      }
       labels={labels}
       onRun={() => void handleRun()}
       onCopyText={() => void handleCopy('text')}

@@ -17,6 +17,7 @@ const hosts: Host[] = [
     logVerbosity: 'normal',
     relatedHostIds: [],
     gatewayHostId: null,
+    httpEndpoint: null,
     createdAt: '',
     updatedAt: ''
   }

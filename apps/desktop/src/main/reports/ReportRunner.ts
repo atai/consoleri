@@ -1,7 +1,8 @@
 import { BrowserWindow } from 'electron'
-import type { ReportProgressEvent, ReportResult, ReportType } from '@consoleri/core'
+import type { ReportConfig, ReportProgressEvent, ReportResult, ReportType } from '@consoleri/core'
 import { IPC_CHANNELS } from '../../shared/types'
 import { connectivityProbe } from './ConnectivityProbe'
+import { customTestProbe } from './CustomTestProbe'
 import { inventoryProbe } from './InventoryProbe'
 import { reportRepository } from './ReportRepository'
 
@@ -33,14 +34,22 @@ function broadcastReportUpdated(reportId: string): void {
 
 async function probeHost(
   type: ReportType,
+  config: ReportConfig,
   hostId: string,
-  profileId: string
+  profileId: string,
+  onCommandProgress?: (commandIndex: number, commandTotal: number) => void
 ): Promise<ReportResult['entries'][number]> {
   switch (type) {
     case 'connectivity_test':
       return connectivityProbe.probe(hostId, profileId)
     case 'inventory':
       return inventoryProbe.probe(hostId, profileId)
+    case 'custom_test':
+      return customTestProbe.probe(hostId, profileId, {
+        commands: config.commands,
+        continueOnError: config.continueOnError,
+        onCommandProgress
+      })
     default:
       throw new Error(`Unsupported report type: ${type}`)
   }
@@ -65,7 +74,25 @@ export class ReportRunner {
         status: 'running'
       })
 
-      const hostResult = await probeHost(report.type, entry.hostId, entry.profileId)
+      const hostResult = await probeHost(
+        report.type,
+        report.config,
+        entry.hostId,
+        entry.profileId,
+        report.type === 'custom_test'
+          ? (commandIndex, commandTotal) => {
+              sendProgress(reportId, {
+                reportId,
+                index,
+                total: entries.length,
+                hostId: entry.hostId,
+                status: 'running',
+                commandIndex,
+                commandTotal
+              })
+            }
+          : undefined
+      )
       results.push(hostResult)
 
       sendProgress(reportId, {

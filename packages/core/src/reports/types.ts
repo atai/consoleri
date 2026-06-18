@@ -1,4 +1,4 @@
-export type ReportType = 'connectivity_test' | 'inventory'
+export type ReportType = 'connectivity_test' | 'inventory' | 'custom_test'
 
 export type ReportHostStatus = 'ok' | 'fail' | 'skipped'
 
@@ -12,6 +12,11 @@ export interface ReportHostEntry {
 
 export type ConnectivityTestEntry = ReportHostEntry
 export type InventoryEntry = ReportHostEntry
+export type CustomTestEntry = ReportHostEntry
+
+export interface CustomTestCommand {
+  command: string
+}
 
 export interface ReportHostResultBase {
   hostId: string
@@ -32,12 +37,22 @@ export interface InventoryConfig {
   entries: InventoryEntry[]
 }
 
-export type ReportConfig = ConnectivityTestConfig | InventoryConfig
+export interface CustomTestConfig {
+  type: 'custom_test'
+  entries: CustomTestEntry[]
+  commands: CustomTestCommand[]
+  continueOnError: boolean
+}
+
+export type ReportConfig = ConnectivityTestConfig | InventoryConfig | CustomTestConfig
 
 export interface ConnectivityTestHostResult extends ReportHostResultBase {
   pingStatus?: ReportHostStatus
   pingDurationMs?: number
   pingError?: string
+  httpStatusCode?: number
+  httpDurationMs?: number
+  httpError?: string
 }
 
 export interface ConnectivityTestResult {
@@ -65,7 +80,28 @@ export interface InventoryResult {
   entries: InventoryHostResult[]
 }
 
-export type ReportResult = ConnectivityTestResult | InventoryResult
+export interface CustomTestCommandResult {
+  index: number
+  command: string
+  status: ReportHostStatus
+  code: number | null
+  stdout: string
+  stderr: string
+  durationMs: number
+  error?: string
+}
+
+export interface CustomTestHostResult extends ReportHostResultBase {
+  commands: CustomTestCommandResult[]
+}
+
+export interface CustomTestResult {
+  type: 'custom_test'
+  runAt: string
+  entries: CustomTestHostResult[]
+}
+
+export type ReportResult = ConnectivityTestResult | InventoryResult | CustomTestResult
 
 export interface Report {
   id: string
@@ -90,6 +126,8 @@ export interface ReportProgressEvent {
   total: number
   hostId: string
   status: ReportHostStatus | 'running'
+  commandIndex?: number
+  commandTotal?: number
 }
 
 export interface ReportFormatLabels {

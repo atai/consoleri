@@ -42,6 +42,20 @@ function normalizeConnectivityHostResult(raw: unknown): ConnectivityTestHostResu
 
   if (isNonEmptyString(entry.pingError)) result.pingError = entry.pingError
 
+  if (
+    typeof entry.httpStatusCode === 'number' &&
+    entry.httpStatusCode >= 100 &&
+    entry.httpStatusCode <= 599
+  ) {
+    result.httpStatusCode = entry.httpStatusCode
+  }
+
+  if (typeof entry.httpDurationMs === 'number' && entry.httpDurationMs >= 0) {
+    result.httpDurationMs = entry.httpDurationMs
+  }
+
+  if (isNonEmptyString(entry.httpError)) result.httpError = entry.httpError
+
   return result
 }
 

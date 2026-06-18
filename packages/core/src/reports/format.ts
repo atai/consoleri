@@ -5,6 +5,11 @@ import {
   summarizeConnectivityResult
 } from './formatConnectivity'
 import {
+  formatCustomTestReportMarkdown,
+  formatCustomTestReportText,
+  summarizeCustomTestResult
+} from './formatCustomTest'
+import {
   formatInventoryReportMarkdown,
   formatInventoryReportText,
   summarizeInventoryResult
@@ -16,6 +21,11 @@ export {
   formatConnectivityReportText,
   summarizeConnectivityResult
 } from './formatConnectivity'
+export {
+  formatCustomTestReportMarkdown,
+  formatCustomTestReportText,
+  summarizeCustomTestResult
+} from './formatCustomTest'
 export {
   formatInventoryReportMarkdown,
   formatInventoryReportText,
@@ -32,6 +42,8 @@ export function formatReportMarkdown(
       return formatConnectivityReportMarkdown(report, result, labels)
     case 'inventory':
       return formatInventoryReportMarkdown(report, result, labels)
+    case 'custom_test':
+      return formatCustomTestReportMarkdown(report, result, labels)
     default:
       return formatConnectivityReportMarkdown(report, result as never, labels)
   }
@@ -47,6 +59,8 @@ export function formatReportText(
       return formatConnectivityReportText(report, result, labels)
     case 'inventory':
       return formatInventoryReportText(report, result, labels)
+    case 'custom_test':
+      return formatCustomTestReportText(report, result, labels)
     default:
       return formatConnectivityReportText(report, result as never, labels)
   }
@@ -58,6 +72,8 @@ export function summarizeReportResult(result: ReportResult): string {
       return summarizeConnectivityResult(result)
     case 'inventory':
       return summarizeInventoryResult(result)
+    case 'custom_test':
+      return summarizeCustomTestResult(result)
     default:
       return ''
   }

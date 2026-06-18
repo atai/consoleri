@@ -142,6 +142,7 @@ export function HostBrowser(): React.JSX.Element {
         port?: number
         osType?: Host['osType']
         tags?: string[]
+        httpEndpoint?: string | null
       }>
       await window.consoleri.hosts.import(items)
       setImportJson('')
