@@ -192,7 +192,7 @@ export class SshSession extends BaseTransport {
     this.stream = stream
     log.append(sessionId, 'info', 'Shell channel open')
     stream.on('data', (data: Buffer) => this.emit('data', data.toString('utf8')))
-    stream.on('close', () => this.emit('exit', 0))
+    stream.on('close', (code: number) => this.emit('exit', code ?? 0))
     stream.stderr?.on('data', (data: Buffer) => this.emit('data', data.toString('utf8')))
   }
 

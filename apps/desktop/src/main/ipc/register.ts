@@ -39,8 +39,16 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
     hostRepository.deleteHost(id)
   })
 
-  ipcMain.handle(IPC_CHANNELS.hostsImport, (_e, items: HostInput[]) => {
-    return hostRepository.importHosts(items)
+  ipcMain.handle(IPC_CHANNELS.hostsImport, (_e, payload: unknown) => {
+    return hostRepository.importHosts(payload)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.hostsExport, () => {
+    return hostRepository.exportHostsBundle()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.hostsExportToFile, () => {
+    return hostRepository.exportHostsToFile()
   })
 
   ipcMain.handle(IPC_CHANNELS.groupsList, () => hostRepository.listGroups())

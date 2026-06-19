@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 interface HostActionsMenuProps {
   onAddHost: () => void
   onImport: () => void
+  onExport: () => void
   onOpenPowerShell: () => void
   onOpenBash: () => void
   wslDistros: { name: string }[]
@@ -12,6 +13,7 @@ interface HostActionsMenuProps {
 export function HostActionsMenu({
   onAddHost,
   onImport,
+  onExport,
   onOpenPowerShell,
   onOpenBash,
   wslDistros,
@@ -71,6 +73,16 @@ export function HostActionsMenu({
               onClick={() => run(onImport)}
             >
               Import JSON…
+            </button>
+          </li>
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-1.5 text-left text-[11px] text-gray-300 hover:bg-[#21262d]"
+              onClick={() => run(onExport)}
+            >
+              Export JSON…
             </button>
           </li>
           <li role="none">

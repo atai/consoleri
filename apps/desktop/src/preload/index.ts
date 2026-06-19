@@ -26,6 +26,7 @@ import type {
   ReportResult,
   ReportProgressEvent
 } from '../shared/types'
+import type { HostsExportDocument } from '@consoleri/core'
 
 export interface ConsoleriAPI {
   hosts: {
@@ -34,7 +35,9 @@ export interface ConsoleriAPI {
     create: (input: HostInput) => Promise<Host>
     update: (id: string, input: Partial<HostInput>) => Promise<Host>
     delete: (id: string) => Promise<void>
-    import: (items: HostInput[]) => Promise<Host[]>
+    import: (payload: unknown) => Promise<Host[]>
+    export: () => Promise<HostsExportDocument>
+    exportToFile: () => Promise<{ path: string } | { canceled: true }>
   }
   groups: {
     list: () => Promise<HostGroup[]>
@@ -154,7 +157,9 @@ const consoleri: ConsoleriAPI = {
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostsCreate, input),
     update: (id, input) => ipcRenderer.invoke(IPC_CHANNELS.hostsUpdate, id, input),
     delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.hostsDelete, id),
-    import: (items) => ipcRenderer.invoke(IPC_CHANNELS.hostsImport, items)
+    import: (payload) => ipcRenderer.invoke(IPC_CHANNELS.hostsImport, payload),
+    export: () => ipcRenderer.invoke(IPC_CHANNELS.hostsExport),
+    exportToFile: () => ipcRenderer.invoke(IPC_CHANNELS.hostsExportToFile)
   },
   groups: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.groupsList),

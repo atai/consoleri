@@ -24,6 +24,12 @@ function shellBasename(shellPath: string): string {
   return parts[parts.length - 1] ?? executable
 }
 
+const BASH_PS1_SHELLS = new Set(['bash', 'sh', 'zsh', 'ksh', 'dash'])
+
+function supportsBashPs1(shell: string): boolean {
+  return BASH_PS1_SHELLS.has(shellBasename(shell))
+}
+
 function augmentShellCommand(shell: string): string {
   const trimmed = shell.trim()
   const base = shellBasename(trimmed)
@@ -37,6 +43,8 @@ function augmentShellCommand(shell: string): string {
   } else if (base === 'zsh') {
     if (!hasLoginFlag(trimmed)) flags.push('-l')
     if (!hasInteractiveFlag(trimmed)) flags.push('-i')
+  } else if (base === 'csh' || base === 'tcsh') {
+    if (!hasInteractiveFlag(trimmed)) flags.push('-i')
   }
 
   if (flags.length === 0) return trimmed
@@ -46,7 +54,10 @@ function augmentShellCommand(shell: string): string {
 function execCommand(shell: string | null | undefined, promptFallback: boolean): RemoteShellInvoke {
   const trimmed = shell?.trim() ?? ''
   const baseCommand = trimmed ? augmentShellCommand(trimmed) : DEFAULT_BASH_COMMAND
-  const command = promptFallback ? wrapShellCommandWithPs1(baseCommand) : baseCommand
+  const command =
+    promptFallback && supportsBashPs1(baseCommand)
+      ? wrapShellCommandWithPs1(baseCommand)
+      : baseCommand
   return { mode: 'exec', command }
 }
 

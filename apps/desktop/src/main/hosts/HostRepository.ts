@@ -1,5 +1,26 @@
 import { nanoid } from 'nanoid'
-import { isKeyFileRef, normalizeHostLogVerbosity, normalizeGatewayHostId, normalizeHttpEndpoint, normalizeRelatedHostIds, rowToHost, rowToProfile } from '@consoleri/core'
+import { dialog } from 'electron'
+import { writeFileSync } from 'fs'
+import {
+  buildHostsExportDocument,
+  hostCreateFromExportItem,
+  hostRelationPatchFromExportItem,
+  groupCreateFromExportItem,
+  isKeyFileRef,
+  normalizeHostLogVerbosity,
+  normalizeGatewayHostId,
+  normalizeHttpEndpoint,
+  normalizeRelatedHostIds,
+  parseHostsImportPayload,
+  profileCreateFromExportItem,
+  resolveHostProfileLink,
+  rowToHost,
+  rowToProfile,
+  serializeHostsExportDocument,
+  sortGroupsForImport,
+  type HostProfileLinkExport,
+  type HostsExportDocument
+} from '@consoleri/core'
 import type {
   ConnectionProfile,
   Host,
@@ -14,6 +35,7 @@ import type {
 } from '../../shared/types'
 import { getDatabase } from '../db/database'
 import { credentialVault } from './CredentialVault'
+import { uxProfileRepository } from '../ux/UxProfileRepository'
 
 export class HostRepository {
   private existingHostIdSet(): Set<string> {
@@ -139,8 +161,89 @@ export class HostRepository {
     getDatabase().prepare('DELETE FROM hosts WHERE id = ?').run(id)
   }
 
-  importHosts(items: HostInput[]): Host[] {
-    return items.map((item) => this.createHost(item))
+  importHosts(payload: unknown): Promise<Host[]> {
+    const doc = parseHostsImportPayload(payload)
+    return this.importHostsBundle(doc)
+  }
+
+  exportHostsBundle(): HostsExportDocument {
+    const groups = this.listGroups()
+    const hosts = this.listHosts()
+    const profiles = this.listProfiles()
+    const links = this.listAllProfileLinks()
+    return buildHostsExportDocument(groups, hosts, profiles, links)
+  }
+
+  async exportHostsToFile(): Promise<{ path: string } | { canceled: true }> {
+    const doc = this.exportHostsBundle()
+    const date = new Date().toISOString().slice(0, 10)
+    const result = await dialog.showSaveDialog({
+      title: 'Export hosts JSON',
+      defaultPath: `consoleri-hosts-${date}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePath) {
+      return { canceled: true }
+    }
+    writeFileSync(result.filePath, serializeHostsExportDocument(doc), 'utf8')
+    return { path: result.filePath }
+  }
+
+  listAllProfileLinks(): HostProfileLinkExport[] {
+    this.syncLegacyProfileLinks()
+    const rows = getDatabase()
+      .prepare('SELECT host_id, profile_id FROM host_profile_links')
+      .all() as Array<{ host_id: string; profile_id: string }>
+    return rows.map((row) => ({
+      hostId: row.host_id,
+      profileId: row.profile_id
+    }))
+  }
+
+  async importHostsBundle(doc: HostsExportDocument): Promise<Host[]> {
+    const groupIdMap = new Map<string, string>()
+    const hostIdMap = new Map<string, string>()
+    const profileIdMap = new Map<string, string>()
+    const createdHosts: Host[] = []
+    const validUxProfileIds = new Set(uxProfileRepository.list().map((profile) => profile.id))
+
+    for (const group of sortGroupsForImport(doc.groups)) {
+      const planned = groupCreateFromExportItem(group, groupIdMap)
+      const created = this.createGroup(planned.name, planned.parentId, planned.sortOrder)
+      groupIdMap.set(planned.exportId, created.id)
+    }
+
+    for (const host of doc.hosts) {
+      const planned = hostCreateFromExportItem(host, groupIdMap, validUxProfileIds)
+      const created = this.createHost(planned.input)
+      hostIdMap.set(planned.exportId, created.id)
+      createdHosts.push(created)
+    }
+
+    for (const profile of doc.profiles) {
+      const planned = profileCreateFromExportItem(profile, hostIdMap)
+      const created = await this.createProfile(planned.input)
+      profileIdMap.set(planned.exportId, created.id)
+    }
+
+    for (const link of doc.links) {
+      const resolved = resolveHostProfileLink(link, hostIdMap, profileIdMap)
+      if (resolved) {
+        this.linkHostProfile(resolved.hostId, resolved.profileId)
+      }
+    }
+
+    for (const host of doc.hosts) {
+      const hostId = hostIdMap.get(host.exportId)
+      if (!hostId) continue
+
+      const patch = hostRelationPatchFromExportItem(host, hostIdMap, profileIdMap)
+      if (patch) {
+        this.updateHost(hostId, patch.patch)
+      }
+    }
+
+    return createdHosts.map((host) => this.getHost(host.id) ?? host)
   }
 
   listGroups(): HostGroup[] {
@@ -158,12 +261,12 @@ export class HostRepository {
       })
   }
 
-  createGroup(name: string, parentId: string | null = null): HostGroup {
+  createGroup(name: string, parentId: string | null = null, sortOrder = 0): HostGroup {
     const id = nanoid()
     getDatabase()
       .prepare(`INSERT INTO host_groups (id, name, parent_id, sort_order) VALUES (?, ?, ?, ?)`)
-      .run(id, name, parentId, 0)
-    return { id, name, parentId, sortOrder: 0 }
+      .run(id, name, parentId, sortOrder)
+    return { id, name, parentId, sortOrder }
   }
 
   private syncLegacyProfileLinks(): void {

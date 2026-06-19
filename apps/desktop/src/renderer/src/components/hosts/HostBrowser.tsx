@@ -136,22 +136,27 @@ export function HostBrowser(): React.JSX.Element {
 
   const handleImport = async (): Promise<void> => {
     try {
-      const items = JSON.parse(importJson) as Array<{
-        name: string
-        hostname: string
-        port?: number
-        osType?: Host['osType']
-        tags?: string[]
-        httpEndpoint?: string | null
-      }>
-      await window.consoleri.hosts.import(items)
+      const parsed: unknown = JSON.parse(importJson)
+      await window.consoleri.hosts.import(parsed)
       setImportJson('')
       setShowImport(false)
       refreshHosts()
       refreshAllHostTags()
-    refreshAllHosts()
-    } catch {
-      alert('Invalid JSON')
+      refreshAllHosts()
+      refreshGroups()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Invalid JSON')
+    }
+  }
+
+  const handleExport = async (): Promise<void> => {
+    try {
+      const result = await window.consoleri.hosts.exportToFile()
+      if ('path' in result) {
+        alert(`Exported to ${result.path}`)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Export failed')
     }
   }
 
@@ -213,6 +218,7 @@ export function HostBrowser(): React.JSX.Element {
               setShowForm(true)
             }}
             onImport={() => setShowImport(true)}
+            onExport={() => void handleExport()}
             onOpenPowerShell={() => openLocalShell('powershell')}
             onOpenBash={() => openLocalShell('bash')}
             wslDistros={wslDistros}
@@ -335,7 +341,7 @@ export function HostBrowser(): React.JSX.Element {
             <textarea
               className="w-full rounded border border-[#30363d] bg-[#0d1117] p-2 text-xs text-gray-300"
               rows={4}
-              placeholder='[{"name":"web-01","hostname":"10.0.0.1","tags":["prod"]}]'
+              placeholder='{"version":1,"hosts":[{"name":"web-01","hostname":"10.0.0.1","tags":["prod"]}]}'
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
             />

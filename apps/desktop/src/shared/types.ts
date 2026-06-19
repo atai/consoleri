@@ -205,6 +205,8 @@ export const IPC_CHANNELS = {
   hostsUpdate: 'hosts:update',
   hostsDelete: 'hosts:delete',
   hostsImport: 'hosts:import',
+  hostsExport: 'hosts:export',
+  hostsExportToFile: 'hosts:export-to-file',
   groupsList: 'hosts:groups:list',
   groupsCreate: 'hosts:groups:create',
   profilesList: 'hosts:profiles:list',

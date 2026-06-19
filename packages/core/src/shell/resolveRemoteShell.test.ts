@@ -14,7 +14,7 @@ describe('resolveRemoteShellInvoke', () => {
     expect(result.mode).toBe('exec')
     if (result.mode === 'exec') {
       expect(result.command).toContain('/bin/bash --login -i')
-      expect(result.command).toContain(`PS1='${buildFallbackPs1().replace(/'/g, `'\\''`)}'`)
+      expect(result.command).toContain(`env PS1='${buildFallbackPs1().replace(/'/g, `'\\''`)}'`)
     }
   })
 
@@ -37,6 +37,25 @@ describe('resolveRemoteShellInvoke', () => {
     expect(resolveRemoteShellInvoke('zsh')).toEqual({
       mode: 'exec',
       command: 'zsh -l -i'
+    })
+  })
+
+  it('augments csh and tcsh with interactive flag', () => {
+    expect(resolveRemoteShellInvoke('/bin/csh')).toEqual({
+      mode: 'exec',
+      command: '/bin/csh -i'
+    })
+    expect(resolveRemoteShellInvoke('/bin/tcsh')).toEqual({
+      mode: 'exec',
+      command: '/bin/tcsh -i'
+    })
+  })
+
+  it('omits bash PS1 wrapper for csh when promptFallback is enabled', () => {
+    const result = resolveRemoteShellInvoke('/bin/csh', { promptFallback: true })
+    expect(result).toEqual({
+      mode: 'exec',
+      command: '/bin/csh -i'
     })
   })
 
@@ -64,7 +83,16 @@ describe('resolveRemoteShellInvoke', () => {
     expect(result.mode).toBe('exec')
     if (result.mode === 'exec') {
       expect(result.command).toContain('/bin/bash --login -i')
-      expect(result.command.startsWith('PS1=')).toBe(true)
+      expect(result.command.startsWith('env PS1=')).toBe(true)
+    }
+  })
+
+  it('uses env PS1 prefix so the command is valid when wrapped by a csh login shell', () => {
+    const result = resolveRemoteShellInvoke(null, { promptFallback: true })
+    expect(result.mode).toBe('exec')
+    if (result.mode === 'exec') {
+      expect(result.command.startsWith('env PS1=')).toBe(true)
+      expect(result.command).not.toMatch(/^PS1=/)
     }
   })
 
