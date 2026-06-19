@@ -1,11 +1,12 @@
 import {
   defaultPortForProtocol,
   isKeyFileRef,
+  isVaultRef,
   keyPathFromRef,
   labelFromKeyPath,
   resolveRdpPort
 } from '@consoleri/core'
-import type { AuthMethod, ConnectionProfile, Host, Protocol, SshKeyInfo } from '@shared/types'
+import type { AuthMethod, ConnectionProfile, Host, Protocol, SecretBackendKind, SshKeyInfo } from '@shared/types'
 
 export function profileAuthLabel(profile: ConnectionProfile): string {
   if (profile.authMethod === 'none' && !profile.credentialRef) return 'no auth'
@@ -16,8 +17,10 @@ export function profileAuthLabel(profile: ConnectionProfile): string {
     const path = keyPathFromRef(profile.credentialRef)
     return `key (${labelFromKeyPath(path)})`
   }
-  if (profile.credentialRef.includes(':key')) return 'key (vault)'
+  if (isVaultRef(profile.credentialRef)) return 'key (vault hc)'
+  if (profile.credentialRef.includes(':key')) return 'key (vault local)'
   if (profile.authMethod === 'password' || profile.credentialRef.includes(':password')) {
+    if (isVaultRef(profile.credentialRef)) return 'password (vault hc)'
     return 'password'
   }
   return profile.authMethod
@@ -38,6 +41,7 @@ function suggestAuthLabel(params: {
   selectedKeyPath?: string | null
   privateKey?: string
   sshKeys?: SshKeyInfo[]
+  secretBackend?: SecretBackendKind
 }): string {
   const supportsAuth =
     params.protocol === 'ssh' || params.protocol === 'rdp' || params.protocol === 'vnc'
@@ -48,7 +52,9 @@ function suggestAuthLabel(params: {
     const match = params.sshKeys?.find((k) => k.privateKeyPath === params.selectedKeyPath)
     return match?.label ?? labelFromKeyPath(params.selectedKeyPath)
   }
-  if (params.privateKey?.trim()) return 'vault'
+  if (params.privateKey?.trim()) {
+    return params.secretBackend === 'vault' ? 'vault hc' : 'vault local'
+  }
   return 'key'
 }
 
@@ -61,6 +67,7 @@ export function suggestProfileName(params: {
   selectedKeyPath?: string | null
   privateKey?: string
   sshKeys?: SshKeyInfo[]
+  secretBackend?: SecretBackendKind
 }): string {
   const displayUsername = params.username.trim() || 'noname'
   const auth = suggestAuthLabel(params)

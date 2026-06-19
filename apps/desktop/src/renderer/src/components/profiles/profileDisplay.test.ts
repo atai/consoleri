@@ -78,7 +78,7 @@ describe('suggestProfileName', () => {
     ).toBe('admin (ssh - Work Key)')
   })
 
-  it('uses vault label for pasted private key', () => {
+  it('uses vault local label for pasted private key', () => {
     expect(
       suggestProfileName({
         username: 'admin',
@@ -88,7 +88,21 @@ describe('suggestProfileName', () => {
         hosts,
         privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----'
       })
-    ).toBe('admin (ssh - vault)')
+    ).toBe('admin (ssh - vault local)')
+  })
+
+  it('uses vault hc label when vault backend selected', () => {
+    expect(
+      suggestProfileName({
+        username: 'admin',
+        protocol: 'ssh',
+        authMethod: 'key',
+        jumpHostId: '',
+        hosts,
+        privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----',
+        secretBackend: 'vault'
+      })
+    ).toBe('admin (ssh - vault hc)')
   })
 
   it('uses noname when username is empty', () => {

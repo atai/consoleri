@@ -4,7 +4,7 @@ import { isTerminalProtocol } from '@consoleri/core'
 import type { OpenSessionRequest, SessionInfo, SessionStatus } from '../../shared/types'
 import { IPC_CHANNELS } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
-import { credentialVault } from '../hosts/CredentialVault'
+import { credentialResolver } from '../services/CredentialResolver'
 import { connectionLog } from './ConnectionLog'
 import { sessionFactory } from './SessionFactory'
 import type { ITransport } from './Transport'
@@ -300,14 +300,14 @@ export class SessionManager {
   async getCredentialsForRdp(profileId: string): Promise<{ username: string; password: string } | null> {
     const profile = hostRepository.getProfile(profileId)
     if (!profile) return null
-    const password = profile.credentialRef ? await credentialVault.retrieve(profile.credentialRef) : null
+    const password = await credentialResolver.resolvePassword(profile)
     return { username: profile.username ?? '', password: password ?? '' }
   }
 
   async getCredentialsForVnc(profileId: string): Promise<string | null> {
     const profile = hostRepository.getProfile(profileId)
-    if (!profile?.credentialRef) return null
-    return credentialVault.retrieve(profile.credentialRef)
+    if (!profile) return null
+    return credentialResolver.resolvePassword(profile)
   }
 }
 

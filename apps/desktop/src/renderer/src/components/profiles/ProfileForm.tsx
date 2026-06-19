@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { defaultPortForProtocol, isKeyFileRef, keyPathFromRef, makeKeyFileRef, resolveRdpPort } from '@consoleri/core'
-import type { AuthMethod, ConnectionProfile, Host, ProfileInput, Protocol, SshKeyInfo } from '@shared/types'
+import { defaultPortForProtocol, isKeyFileRef, isVaultRef, keyPathFromRef, makeKeyFileRef, resolveRdpPort } from '@consoleri/core'
+import type { AuthMethod, ConnectionProfile, Host, ProfileInput, Protocol, SecretBackendKind, SshKeyInfo } from '@shared/types'
 import { profileAuthLabel, suggestProfileName } from './profileDisplay'
 import { applyProfileTemplate, profileInputFromTemplate } from './profileTemplate'
 import { PickProfileDialog } from './PickProfileDialog'
@@ -56,6 +56,11 @@ export function ProfileForm({
   const [cloneFromProfileId, setCloneFromProfileId] = useState<string | null>(null)
   const [showPickDialog, setShowPickDialog] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [vaultEnabled, setVaultEnabled] = useState(false)
+  const [secretBackend, setSecretBackend] = useState<SecretBackendKind>(() => {
+    if (profile?.credentialRef && isVaultRef(profile.credentialRef)) return 'vault'
+    return 'local'
+  })
 
   useEffect(() => {
     if (!hostsProp) {
@@ -65,7 +70,13 @@ export function ProfileForm({
 
   useEffect(() => {
     window.consoleri.keys.list().then(setSshKeys)
-  }, [])
+    window.consoleri.vault.getSettings().then((settings) => {
+      setVaultEnabled(settings.enabled)
+      if (!profile?.credentialRef) {
+        setSecretBackend(settings.defaultBackend)
+      }
+    })
+  }, [profile?.credentialRef])
 
   useEffect(() => {
     if (isEdit || name.trim() !== '') return
@@ -78,7 +89,8 @@ export function ProfileForm({
         hosts,
         selectedKeyPath,
         privateKey,
-        sshKeys
+        sshKeys,
+        secretBackend
       })
     )
   }, [
@@ -91,7 +103,8 @@ export function ProfileForm({
     hosts,
     selectedKeyPath,
     privateKey,
-    sshKeys
+    sshKeys,
+    secretBackend
   ])
 
   const supportsAuth = protocol === 'ssh' || protocol === 'rdp' || protocol === 'vnc'
@@ -184,7 +197,8 @@ export function ProfileForm({
         const draftInput: ProfileInput = {
           ...input,
           password: password || undefined,
-          privateKey: privateKey || undefined
+          privateKey: privateKey || undefined,
+          secretBackend: password || privateKey ? secretBackend : undefined
         }
         if (authMethod === 'key' && selectedKeyPath) {
           draftInput.credentialRef = makeKeyFileRef(selectedKeyPath)
@@ -202,6 +216,7 @@ export function ProfileForm({
         const patch: Partial<ProfileInput> = { ...input }
         if (password) patch.password = password
         if (privateKey) patch.privateKey = privateKey
+        if (password || privateKey) patch.secretBackend = secretBackend
         if (authMethod === 'key' && selectedKeyPath) {
           patch.credentialRef = makeKeyFileRef(selectedKeyPath)
         }
@@ -211,7 +226,8 @@ export function ProfileForm({
           ...input,
           linkHostId,
           password: password || undefined,
-          privateKey: privateKey || undefined
+          privateKey: privateKey || undefined,
+          secretBackend: password || privateKey ? secretBackend : undefined
         }
         if (authMethod === 'key' && selectedKeyPath) {
           createInput.credentialRef = makeKeyFileRef(selectedKeyPath)
@@ -308,6 +324,20 @@ export function ProfileForm({
                   {m}
                 </option>
               ))}
+            </select>
+          </label>
+        )}
+
+        {supportsAuth && (authMethod === 'password' || authMethod === 'key') && vaultEnabled && (
+          <label className="block">
+            <span className="text-gray-400">Secret storage</span>
+            <select
+              className="mt-1 w-full rounded border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-gray-100"
+              value={secretBackend}
+              onChange={(e) => setSecretBackend(e.target.value === 'vault' ? 'vault' : 'local')}
+            >
+              <option value="local">Local vault (OS keychain)</option>
+              <option value="vault">HashiCorp Vault</option>
             </select>
           </label>
         )}

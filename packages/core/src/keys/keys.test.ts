@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { authTypeFromCredentialRef } from '../credentials/resolveAuth'
 import {
   isKeyFileRef,
+  isVaultRef,
   keyFilePassphraseRef,
   keyPathFromRef,
   labelFromKeyPath,
-  makeKeyFileRef
+  makeKeyFileRef,
+  makeVaultKv2Ref,
+  parseVaultRef
 } from './credentialRef'
 import { isEncryptedPrivateKey, looksLikePrivateKeyContent } from './detectPrivateKey'
 import { parsePublicKeyFile, parsePublicKeyLine } from './parsePublicKey'
@@ -55,6 +58,27 @@ describe('credentialRef', () => {
     expect(labelFromKeyPath('/home/user/.ssh/id_ed25519')).toBe('id_ed25519')
     expect(labelFromKeyPath('C:\\Users\\me\\.ssh\\id_rsa')).toBe('id_rsa')
     expect(labelFromKeyPath('')).toBe('')
+  })
+
+  it('round-trips vault kv2 refs', () => {
+    const ref = makeVaultKv2Ref('secret', 'consoleri/profiles/abc123', 'password')
+    expect(isVaultRef(ref)).toBe(true)
+    expect(parseVaultRef(ref)).toEqual({
+      mount: 'secret',
+      logicalPath: 'consoleri/profiles/abc123',
+      field: 'password'
+    })
+    expect(authTypeFromCredentialRef(ref)).toBe('password')
+  })
+
+  it('detects private key vault fields', () => {
+    const ref = makeVaultKv2Ref('secret', 'consoleri/profiles/abc123', 'private_key')
+    expect(authTypeFromCredentialRef(ref)).toBe('privateKey')
+  })
+
+  it('rejects invalid vault refs', () => {
+    expect(() => parseVaultRef('profile:1:password')).toThrow(/Not a vault ref/)
+    expect(() => parseVaultRef('vault:kv2:secret-only')).toThrow(/Invalid vault ref/)
   })
 })
 

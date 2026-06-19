@@ -1,6 +1,6 @@
 import type { AppView } from '@consoleri/core'
 import type { LucideIcon } from 'lucide-react'
-import { LayoutList, Network, Palette, ClipboardCheck } from 'lucide-react'
+import { LayoutList, Network, Palette, ClipboardCheck, KeyRound } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 
 const MAIN_NAV_ITEMS: Array<{ view: AppView; label: string; title: string; Icon: LucideIcon }> = [
@@ -8,6 +8,13 @@ const MAIN_NAV_ITEMS: Array<{ view: AppView; label: string; title: string; Icon:
   { view: 'reports', label: 'Reports', title: 'Host reports', Icon: ClipboardCheck },
   { view: 'map', label: 'Map', title: 'Network map', Icon: Network }
 ]
+
+const VAULT_NAV_ITEM = {
+  view: 'vault' as const,
+  label: 'Vault',
+  title: 'HashiCorp Vault settings',
+  Icon: KeyRound
+}
 
 const PROFILE_NAV_ITEM = {
   view: 'profile' as const,
@@ -68,7 +75,14 @@ export function NavRail(): React.JSX.Element {
         ))}
       </div>
 
-      <div className="mt-auto flex flex-col items-center pt-2">
+      <div className="mt-auto flex flex-col items-center gap-1 pt-2">
+        <NavRailButton
+          active={appView === VAULT_NAV_ITEM.view}
+          label={VAULT_NAV_ITEM.label}
+          title={VAULT_NAV_ITEM.title}
+          Icon={VAULT_NAV_ITEM.Icon}
+          onClick={() => setAppView(VAULT_NAV_ITEM.view)}
+        />
         <NavRailButton
           active={appView === PROFILE_NAV_ITEM.view}
           label={PROFILE_NAV_ITEM.label}

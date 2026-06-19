@@ -24,7 +24,10 @@ import type {
   Report,
   ReportInput,
   ReportResult,
-  ReportProgressEvent
+  ReportProgressEvent,
+  VaultSettings,
+  VaultSettingsUpdate,
+  VaultStatus
 } from '../shared/types'
 import type { HostsExportDocument } from '@consoleri/core'
 
@@ -147,6 +150,14 @@ export interface ConsoleriAPI {
     openWindow: (reportId: string) => Promise<void>
     onProgress: (cb: (event: ReportProgressEvent) => void) => () => void
     onUpdated: (cb: (report: Report) => void) => () => void
+  }
+  vault: {
+    getSettings: () => Promise<VaultSettings>
+    updateSettings: (patch: VaultSettingsUpdate) => Promise<VaultSettings>
+    testConnection: () => Promise<VaultStatus>
+    getStatus: () => Promise<VaultStatus>
+    login: () => Promise<void>
+    logout: () => Promise<void>
   }
 }
 
@@ -289,6 +300,14 @@ const consoleri: ConsoleriAPI = {
       ipcRenderer.on(IPC_CHANNELS.reportUpdated, listener)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.reportUpdated, listener)
     }
+  },
+  vault: {
+    getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.vaultGetSettings),
+    updateSettings: (patch) => ipcRenderer.invoke(IPC_CHANNELS.vaultUpdateSettings, patch),
+    testConnection: () => ipcRenderer.invoke(IPC_CHANNELS.vaultTestConnection),
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.vaultStatus),
+    login: () => ipcRenderer.invoke(IPC_CHANNELS.vaultLogin),
+    logout: () => ipcRenderer.invoke(IPC_CHANNELS.vaultLogout)
   }
 }
 

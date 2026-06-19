@@ -3,8 +3,8 @@ export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, CustomTestConfig, CustomTestEntry, CustomTestCommand, CustomTestResult, CustomTestHostResult, CustomTestCommandResult, ReportProgressEvent } from '@consoleri/core'
-import type { HostLogVerbosity } from '@consoleri/core'
+export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, CustomTestConfig, CustomTestEntry, CustomTestCommand, CustomTestResult, CustomTestHostResult, CustomTestCommandResult, ReportProgressEvent, VaultSettings, VaultSettingsUpdate, VaultStatus, VaultAuthMethod, SecretBackendKind } from '@consoleri/core'
+import type { HostLogVerbosity, SecretBackendKind } from '@consoleri/core'
 
 export interface LogEntry {
   id: string
@@ -134,6 +134,7 @@ export interface ProfileInput {
   extra?: Record<string, unknown>
   password?: string
   privateKey?: string
+  secretBackend?: SecretBackendKind
   cloneFromProfileId?: string
   linkHostId?: string
 }
@@ -275,5 +276,11 @@ export const IPC_CHANNELS = {
   reportProgress: 'report:progress',
   reportUpdated: 'report:updated',
   clipboardReadText: 'clipboard:readText',
-  clipboardWriteText: 'clipboard:writeText'
+  clipboardWriteText: 'clipboard:writeText',
+  vaultGetSettings: 'vault:getSettings',
+  vaultUpdateSettings: 'vault:updateSettings',
+  vaultTestConnection: 'vault:testConnection',
+  vaultLogin: 'vault:login',
+  vaultLogout: 'vault:logout',
+  vaultStatus: 'vault:status'
 } as const

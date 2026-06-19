@@ -1,7 +1,7 @@
 export const MAP_VIEW_VERSION = 1
 
 export type MapViewMode = 'logical' | 'network'
-export type AppView = 'list' | 'map' | 'profile' | 'reports'
+export type AppView = 'list' | 'map' | 'profile' | 'reports' | 'vault'
 
 export interface MapViewSettings {
   version: number

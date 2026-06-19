@@ -2,11 +2,14 @@ import { nanoid } from 'nanoid'
 import { dialog } from 'electron'
 import { writeFileSync } from 'fs'
 import {
+  authTypeFromCredentialRef,
   buildHostsExportDocument,
   hostCreateFromExportItem,
   hostRelationPatchFromExportItem,
   groupCreateFromExportItem,
   isKeyFileRef,
+  isVaultRef,
+  makeProfileCredentialRef,
   normalizeHostLogVerbosity,
   normalizeGatewayHostId,
   normalizeHttpEndpoint,
@@ -34,7 +37,8 @@ import type {
   WorkspaceState
 } from '../../shared/types'
 import { getDatabase } from '../db/database'
-import { credentialVault } from './CredentialVault'
+import { secretBackendService } from '../secrets/SecretBackendService'
+import { vaultSettingsRepository } from '../vault/VaultSettingsRepository'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
 
 export class HostRepository {
@@ -336,33 +340,78 @@ export class HostRepository {
     return row ? rowToProfile(row as Record<string, unknown>) : null
   }
 
+  private vaultOptions() {
+    const settings = vaultSettingsRepository.getSettings()
+    return { mount: settings.defaultKvMount, prefix: settings.secretPathPrefix }
+  }
+
+  private resolveSecretBackend(input?: Partial<ProfileInput>): 'local' | 'vault' {
+    return input?.secretBackend ?? vaultSettingsRepository.getDefaultBackend()
+  }
+
+  private async deleteCredentialRef(credentialRef: string | null): Promise<void> {
+    if (!credentialRef || isKeyFileRef(credentialRef)) return
+    try {
+      await secretBackendService.delete(credentialRef)
+    } catch {
+      /* best effort cleanup */
+    }
+  }
+
   private async copyCredentialRefForProfile(
     sourceCredentialRef: string | null,
     newProfileId: string
   ): Promise<string | null> {
     if (!sourceCredentialRef) return null
     if (isKeyFileRef(sourceCredentialRef)) return sourceCredentialRef
-    if (!sourceCredentialRef.startsWith('profile:')) return sourceCredentialRef
 
-    const secret = await credentialVault.retrieve(sourceCredentialRef)
+    const secret = await secretBackendService.retrieve(sourceCredentialRef)
     if (!secret) return null
+
+    if (isVaultRef(sourceCredentialRef)) {
+      const material =
+        authTypeFromCredentialRef(sourceCredentialRef) === 'privateKey' ? 'privateKey' : 'password'
+      const credentialRef = makeProfileCredentialRef(
+        'vault',
+        newProfileId,
+        material,
+        this.vaultOptions()
+      )
+      await secretBackendService.store(credentialRef, secret)
+      return credentialRef
+    }
+
+    if (!sourceCredentialRef.startsWith('profile:')) return sourceCredentialRef
 
     const suffix = sourceCredentialRef.includes(':password') ? ':password' : ':key'
     const credentialRef = `profile:${newProfileId}${suffix}`
-    await credentialVault.store(credentialRef, secret)
+    await secretBackendService.store(credentialRef, secret)
+    return credentialRef
+  }
+
+  private async storeProfileSecret(
+    backend: 'local' | 'vault',
+    profileId: string,
+    material: 'password' | 'privateKey',
+    secret: string
+  ): Promise<string> {
+    const credentialRef =
+      backend === 'vault'
+        ? makeProfileCredentialRef('vault', profileId, material, this.vaultOptions())
+        : makeProfileCredentialRef('local', profileId, material)
+    await secretBackendService.store(credentialRef, secret)
     return credentialRef
   }
 
   async createProfile(input: ProfileInput): Promise<ConnectionProfile> {
     const id = nanoid()
     let credentialRef = input.credentialRef ?? null
+    const backend = this.resolveSecretBackend(input)
 
     if (input.password) {
-      credentialRef = `profile:${id}:password`
-      await credentialVault.store(credentialRef, input.password)
+      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password)
     } else if (input.privateKey) {
-      credentialRef = `profile:${id}:key`
-      await credentialVault.store(credentialRef, input.privateKey)
+      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey)
     } else if (input.cloneFromProfileId) {
       const source = this.getProfile(input.cloneFromProfileId)
       if (source) {
@@ -399,12 +448,13 @@ export class HostRepository {
     if (!existing) throw new Error(`Profile not found: ${id}`)
 
     let credentialRef = input.credentialRef !== undefined ? input.credentialRef : existing.credentialRef
+    const backend = this.resolveSecretBackend(input)
     if (input.password) {
-      credentialRef = `profile:${id}:password`
-      await credentialVault.store(credentialRef, input.password)
+      await this.deleteCredentialRef(existing.credentialRef)
+      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password)
     } else if (input.privateKey) {
-      credentialRef = `profile:${id}:key`
-      await credentialVault.store(credentialRef, input.privateKey)
+      await this.deleteCredentialRef(existing.credentialRef)
+      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey)
     }
 
     getDatabase()
@@ -425,7 +475,11 @@ export class HostRepository {
     return this.getProfile(id)!
   }
 
-  deleteProfile(id: string): void {
+  async deleteProfile(id: string): Promise<void> {
+    const existing = this.getProfile(id)
+    if (existing?.credentialRef) {
+      await this.deleteCredentialRef(existing.credentialRef)
+    }
     getDatabase().prepare('DELETE FROM connection_profiles WHERE id = ?').run(id)
   }
 

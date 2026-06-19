@@ -1,10 +1,12 @@
 import { ipcMain, clipboard, type BrowserWindow } from 'electron'
 import { nanoid } from 'nanoid'
 import { IPC_CHANNELS } from '../../shared/types'
-import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState, DeployKeyRequest, ReportInput } from '../../shared/types'
+import type { HostFilter, HostInput, ProfileInput, UxProfileInput, WorkspaceState, DeployKeyRequest, ReportInput, VaultSettingsUpdate } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
-import { credentialVault } from '../hosts/CredentialVault'
+import { secretBackendService } from '../secrets/SecretBackendService'
+import { vaultSettingsRepository } from '../vault/VaultSettingsRepository'
+import { startVaultOidcLogin, logoutVaultOidc } from '../vault/VaultOidcLogin'
 import { sessionManager } from '../sessions/SessionManager'
 import { listWslDistros } from '../sessions/shellUtils'
 import { openLogWindow, registerLogContext } from '../windows/LogWindow'
@@ -70,7 +72,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   })
 
   ipcMain.handle(IPC_CHANNELS.profilesDelete, (_e, id: string) => {
-    hostRepository.deleteProfile(id)
+    return hostRepository.deleteProfile(id)
   })
 
   ipcMain.handle(IPC_CHANNELS.profilesLink, (_e, hostId: string, profileId: string) => {
@@ -93,11 +95,35 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   )
 
   ipcMain.handle(IPC_CHANNELS.credentialsStore, (_e, ref: string, secret: string) => {
-    return credentialVault.store(ref, secret)
+    return secretBackendService.store(ref, secret)
   })
 
   ipcMain.handle(IPC_CHANNELS.credentialsDelete, (_e, ref: string) => {
-    return credentialVault.delete(ref)
+    return secretBackendService.delete(ref)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultGetSettings, () => {
+    return vaultSettingsRepository.getSettings()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultUpdateSettings, (_e, patch: VaultSettingsUpdate) => {
+    return vaultSettingsRepository.updateSettings(patch)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultTestConnection, () => {
+    return vaultSettingsRepository.testConnection()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultStatus, () => {
+    return vaultSettingsRepository.getStatus()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultLogin, () => {
+    return startVaultOidcLogin()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.vaultLogout, () => {
+    return logoutVaultOidc()
   })
 
   ipcMain.handle(IPC_CHANNELS.sessionsOpen, (_e, request, cols?: number, rows?: number) => {
