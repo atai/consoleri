@@ -5,7 +5,20 @@ import { ironrdpWasmPlugin } from './src/renderer/plugins/ironrdpWasmPlugin'
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    include: ['src/renderer/src/**/*.test.ts']
+    include: ['src/renderer/src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      all: true,
+      include: ['src/renderer/src/**/*.{ts,tsx}'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.d.ts',
+        '**/index.ts',
+        '**/types.ts'
+      ],
+      reporter: ['text', 'html', 'lcov', 'json'],
+      reportsDirectory: './coverage/renderer'
+    }
   },
   plugins: [ironrdpWasmPlugin(__dirname)],
   resolve: {

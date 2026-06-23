@@ -21,7 +21,7 @@
     "build:mac": "pnpm run build && electron-builder --mac",
     "build:linux": "pnpm run build && electron-builder --linux",
     "package": "pnpm run build:win",
-    "test": "vitest run && vitest run --config vitest.main.config.ts",
+    "test": "vitest run --coverage && vitest run --config vitest.main.config.ts --coverage",
     "test:main": "vitest run --config vitest.main.config.ts",
     "test:watch": "vitest"
   },
@@ -64,6 +64,7 @@
     "@types/ssh2": "^1.15.5",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "3.2.6",
     "electron": "42.2.0",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
@@ -71,11 +72,11 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
+    "jsdom": "^26.1.0",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
-    "vitest": "^3.2.4",
-    "jsdom": "^26.1.0"
+    "vitest": "^3.2.4"
   }
 }
