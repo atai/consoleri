@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { Terminal } from '@xterm/xterm'
 import { DEFAULT_TERMINAL_APPEARANCE } from '@consoleri/core'
 import { applyTerminalOptions, buildTerminalOptions } from './terminalOptions'
@@ -43,7 +43,7 @@ describe('applyTerminalOptions', () => {
         customGlyphs: false,
         scrollback: 0
       }
-    } as Terminal
+    } as unknown as Terminal
 
     applyTerminalOptions(term, DEFAULT_TERMINAL_APPEARANCE, { fontSize: 11 })
 

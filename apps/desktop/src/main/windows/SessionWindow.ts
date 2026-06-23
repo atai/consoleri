@@ -4,17 +4,16 @@ import { is } from '@electron-toolkit/utils'
 import { APP_NAME, appIconPath } from '../appBranding'
 import { sessionManager } from '../sessions/SessionManager'
 import { formatSessionWindowTitle, joinWindowTitle, pinBrowserWindowTitle } from '../windowTitles'
+import {
+  registerSessionWindow,
+  unregisterSessionWindow,
+  getRegisteredSessionWindow
+} from './SessionWindowRegistry'
 
-const sessionWindows = new Map<string, BrowserWindow>()
-
-export function getSessionWindow(sessionId: string): BrowserWindow | undefined {
-  const win = sessionWindows.get(sessionId)
-  if (win && !win.isDestroyed()) return win
-  return undefined
-}
+export { getRegisteredSessionWindow as getSessionWindow }
 
 export function openSessionWindow(sessionId: string): BrowserWindow {
-  const existing = getSessionWindow(sessionId)
+  const existing = getRegisteredSessionWindow(sessionId)
   const info = sessionManager.list().find((s) => s.id === sessionId)
   const title = info
     ? formatSessionWindowTitle(info)
@@ -48,12 +47,10 @@ export function openSessionWindow(sessionId: string): BrowserWindow {
     return session ? formatSessionWindowTitle(session) : joinWindowTitle('Session', APP_NAME)
   })
 
-  sessionWindows.set(sessionId, win)
-  sessionManager.registerSessionWindow(sessionId, win)
+  registerSessionWindow(sessionId, win)
 
   win.on('closed', () => {
-    sessionWindows.delete(sessionId)
-    sessionManager.unregisterSessionWindow(sessionId)
+    unregisterSessionWindow(sessionId)
     void sessionManager.close(sessionId)
   })
 
@@ -70,10 +67,9 @@ export function openSessionWindow(sessionId: string): BrowserWindow {
 }
 
 export function closeSessionWindow(sessionId: string): void {
-  const win = sessionWindows.get(sessionId)
-  if (!win || win.isDestroyed()) return
+  const win = getRegisteredSessionWindow(sessionId)
+  if (!win) return
   win.removeAllListeners('closed')
   win.close()
-  sessionWindows.delete(sessionId)
-  sessionManager.unregisterSessionWindow(sessionId)
+  unregisterSessionWindow(sessionId)
 }

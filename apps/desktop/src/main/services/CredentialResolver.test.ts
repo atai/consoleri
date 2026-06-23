@@ -3,7 +3,7 @@ import type { ConnectionProfile } from '../../shared/types'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 const { mockRetrieve, mockStore, mockDelete } = vi.hoisted(() => ({
-  mockRetrieve: vi.fn<[string], Promise<string | null>>(),
+  mockRetrieve: vi.fn<() => Promise<string | null>>(),
   mockStore: vi.fn(),
   mockDelete: vi.fn()
 }))
@@ -92,7 +92,7 @@ describe('resolveForProfile', () => {
 
   it('reads keyfile from disk and retrieves passphrase for keyfile ref', async () => {
     const keyContent = '-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----'
-    mockReadFileSync.mockReturnValue(keyContent as unknown as Buffer)
+    mockReadFileSync.mockReturnValue(keyContent)
     mockRetrieve.mockResolvedValue('my-passphrase')
 
     const result = await resolver.resolveForProfile(
@@ -108,7 +108,7 @@ describe('resolveForProfile', () => {
 
   it('returns privateKey without passphrase when no passphrase stored for keyfile', async () => {
     const keyContent = '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----'
-    mockReadFileSync.mockReturnValue(keyContent as unknown as Buffer)
+    mockReadFileSync.mockReturnValue(keyContent)
     mockRetrieve.mockResolvedValue(null)
 
     const result = await resolver.resolveForProfile(

@@ -1,6 +1,7 @@
 import type { ConnectionProfile } from '../../shared/types'
 import type { Host } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 
 export type ResolvedReportHostProfile =
   | { ok: true; host: Host; profile: ConnectionProfile }
@@ -19,7 +20,7 @@ export function resolveReportHostProfile(
     }
   }
 
-  const profiles = hostRepository.listProfiles(host.id)
+  const profiles = profileRepository.listProfiles(host.id)
   const profile = profiles.find((p) => p.id === profileId)
   if (!profile) {
     return {

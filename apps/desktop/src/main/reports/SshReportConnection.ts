@@ -1,6 +1,7 @@
 import { defaultPortForProtocol } from '@consoleri/core'
 import type { Client } from 'ssh2'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 import {
   credentialResolver,
   findSshProfile,
@@ -83,7 +84,7 @@ export class SshReportConnection {
         if (!jumpHost) {
           throw new Error('Jump host not found')
         }
-        const jumpProfiles = hostRepository.listProfiles(profile.jumpHostId)
+        const jumpProfiles = profileRepository.listProfiles(profile.jumpHostId)
         const jumpProfile = findSshProfile(jumpProfiles, null)
         if (!jumpProfile) {
           throw new Error('Jump host has no SSH profile')

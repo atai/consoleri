@@ -1,5 +1,5 @@
 import type { Host, OpenSessionRequest } from '@shared/types'
-import { useAppStore } from '../stores/appStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
 import { openSession, openSessionAndAddToWorkspace } from './openSession'
 
 export async function resolveHostConnectRequest(
@@ -31,13 +31,13 @@ export async function connectHostInWindow(host: Host, profileId?: string): Promi
 }
 
 export async function connectFromList(host: Host, profileId?: string): Promise<void> {
-  const mode = useAppStore.getState().settings.sessionOpenMode
+  const mode = usePreferencesStore.getState().settings.sessionOpenMode
   if (mode === 'window') return connectHostInWindow(host, profileId)
   return connectHost(host, profileId)
 }
 
 export async function openLocalSessionFromList(request: OpenSessionRequest): Promise<void> {
-  const mode = useAppStore.getState().settings.sessionOpenMode
+  const mode = usePreferencesStore.getState().settings.sessionOpenMode
   if (mode === 'window') {
     const session = await openSession(request)
     if (session) await window.consoleri.sessions.openSessionWindow(session.id)

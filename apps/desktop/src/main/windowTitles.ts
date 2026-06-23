@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { APP_NAME } from './appBranding'
 import { hostRepository } from './hosts/HostRepository'
+import { profileRepository } from './hosts/ProfileRepository'
 import type { SessionInfo } from '../shared/types'
 
 export const WINDOW_TITLE_SEP = ' - '
@@ -26,7 +27,7 @@ export function pinBrowserWindowTitle(win: BrowserWindow, getTitle: () => string
 
 function hostProfileParts(hostId?: string | null, profileId?: string | null): string[] {
   const host = hostId ? hostRepository.getHost(hostId) : null
-  const profile = profileId ? hostRepository.getProfile(profileId) : null
+  const profile = profileId ? profileRepository.getProfile(profileId) : null
   if (host && profile) return [host.name, profile.name]
   if (host) return [host.name]
   return []

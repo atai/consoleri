@@ -17,7 +17,7 @@ const {
   mockLogGetEntries,
   mockLogRemoveSession
 } = vi.hoisted(() => ({
-  mockCreateTransport: vi.fn<[string, unknown, number, number], Promise<SessionTransportResult>>(),
+  mockCreateTransport: vi.fn<() => Promise<SessionTransportResult>>(),
   mockLogAppend: vi.fn(),
   mockLogClear: vi.fn(),
   mockLogSetVerbosity: vi.fn(),

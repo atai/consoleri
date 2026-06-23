@@ -8,6 +8,7 @@ import {
 } from '@consoleri/core'
 import type { DeployKeyRequest, DeployKeyResult } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 import { sessionManager } from '../sessions/SessionManager'
 import { credentialResolver, findSshProfile } from '../services/CredentialResolver'
 import {
@@ -41,7 +42,7 @@ export class SshKeyDeployer {
       return { success: false, message: 'Host not found', logId }
     }
 
-    const profiles = hostRepository.listProfiles(host.id).filter((p) => p.protocol === 'ssh')
+    const profiles = profileRepository.listProfiles(host.id).filter((p) => p.protocol === 'ssh')
     const profile = request.profileId
       ? profiles.find((p) => p.id === request.profileId) ?? null
       : findSshProfile(profiles, null)
@@ -91,7 +92,7 @@ export class SshKeyDeployer {
           log('error', 'Jump host not found')
           return { success: false, message: 'Jump host not found', logId }
         }
-        const jumpProfiles = hostRepository.listProfiles(profile.jumpHostId)
+        const jumpProfiles = profileRepository.listProfiles(profile.jumpHostId)
         const jumpProfile = findSshProfile(jumpProfiles, null)
         if (!jumpProfile) {
           log('error', 'Jump host has no SSH profile')

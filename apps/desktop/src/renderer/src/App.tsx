@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AppShell } from './components/layout/AppShell'
 import { useAppStore } from './stores/appStore'
+import { useSessionWorkspaceStore } from './stores/sessionWorkspaceStore'
 import { useUxProfileStore } from './stores/uxProfileStore'
 import './assets/app.css'
 
 function App(): React.JSX.Element {
-  const { setWorkspace, refreshHosts } = useAppStore()
+  const { refreshHosts } = useAppStore()
+  const { setWorkspace } = useSessionWorkspaceStore()
   const refreshUxProfiles = useUxProfileStore((s) => s.refresh)
   const [workspaceReady, setWorkspaceReady] = useState(false)
 

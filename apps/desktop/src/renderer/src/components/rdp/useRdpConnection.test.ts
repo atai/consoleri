@@ -66,7 +66,7 @@ describe('attachInputHandlers: event registration', () => {
 
     attachInputHandlers(canvas, getSession, api)
 
-    const registered = Array.from(canvas.addEventListener.mock.calls.map((c) => c[0]))
+    const registered = vi.mocked(canvas.addEventListener).mock.calls.map((c) => c[0])
     expect(registered).toContain('keydown')
     expect(registered).toContain('keyup')
     expect(registered).toContain('mousemove')
@@ -91,7 +91,7 @@ describe('attachInputHandlers: cleanup removes all listeners', () => {
     const cleanup = attachInputHandlers(canvas, () => null, api)
     cleanup()
 
-    const removedTypes = Array.from(canvas.removeEventListener.mock.calls.map((c) => c[0]))
+    const removedTypes = vi.mocked(canvas.removeEventListener).mock.calls.map((c) => c[0])
     expect(removedTypes).toContain('keydown')
     expect(removedTypes).toContain('keyup')
     expect(removedTypes).toContain('mousemove')
@@ -120,6 +120,18 @@ describe('attachInputHandlers: input event forwarding', () => {
     expect(api.DeviceEvent.keyPressed).toHaveBeenCalled()
   })
 
+  it('calls session.applyInputs with an InputTransaction on keydown when session is active', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('keydown') ?? []
+    handlers[0](new KeyboardEvent('keydown', { code: 'Enter' }))
+
+    expect(fakeSession.applyInputs).toHaveBeenCalledOnce()
+  })
+
   it('does not forward keydown for unknown key codes', () => {
     const canvas = makeCanvas()
     const api = makeIronRdpApi()
@@ -130,6 +142,31 @@ describe('attachInputHandlers: input event forwarding', () => {
 
     handlers[0](new KeyboardEvent('keydown', { code: 'UnknownKey12345' }))
     expect(api.DeviceEvent.keyPressed).not.toHaveBeenCalled()
+  })
+
+  it('calls DeviceEvent.keyReleased with resolved scancode on keyup', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('keyup') ?? []
+    expect(handlers).toHaveLength(1)
+
+    handlers[0](new KeyboardEvent('keyup', { code: 'KeyA' }))
+    expect(api.DeviceEvent.keyReleased).toHaveBeenCalled()
+    expect(fakeSession.applyInputs).toHaveBeenCalledOnce()
+  })
+
+  it('does not forward keyup for unknown key codes', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+
+    attachInputHandlers(canvas, () => null, api)
+    const handlers = canvas._listeners.get('keyup') ?? []
+
+    handlers[0](new KeyboardEvent('keyup', { code: 'UnknownKey99' }))
+    expect(api.DeviceEvent.keyReleased).not.toHaveBeenCalled()
   })
 
   it('calls DeviceEvent.mouseMove on mousemove', () => {
@@ -144,6 +181,94 @@ describe('attachInputHandlers: input event forwarding', () => {
     expect(api.DeviceEvent.mouseMove).toHaveBeenCalled()
   })
 
+  it('calls DeviceEvent.mouseButtonPressed and canvas.focus on mousedown', () => {
+    const canvas = makeCanvas()
+    ;(canvas as unknown as { focus: ReturnType<typeof vi.fn> }).focus = vi.fn()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('mousedown') ?? []
+
+    handlers[0](new MouseEvent('mousedown', { button: 0 }))
+    expect(api.DeviceEvent.mouseButtonPressed).toHaveBeenCalledWith(0)
+    expect((canvas as unknown as { focus: ReturnType<typeof vi.fn> }).focus).toHaveBeenCalled()
+  })
+
+  it('calls DeviceEvent.mouseButtonReleased on mouseup', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('mouseup') ?? []
+
+    handlers[0](new MouseEvent('mouseup', { button: 2 }))
+    expect(api.DeviceEvent.mouseButtonReleased).toHaveBeenCalledWith(2)
+    expect(fakeSession.applyInputs).toHaveBeenCalledOnce()
+  })
+
+  it('calls DeviceEvent.wheelRotations(true) on vertical wheel', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('wheel') ?? []
+
+    handlers[0](new WheelEvent('wheel', { deltaY: 120, deltaX: 0 }))
+    expect(api.DeviceEvent.wheelRotations).toHaveBeenCalledWith(true, expect.any(Number), expect.anything())
+    expect(fakeSession.applyInputs).toHaveBeenCalledOnce()
+  })
+
+  it('calls DeviceEvent.wheelRotations(false) on horizontal wheel', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('wheel') ?? []
+
+    handlers[0](new WheelEvent('wheel', { deltaY: 0, deltaX: 80 }))
+    expect(api.DeviceEvent.wheelRotations).toHaveBeenCalledWith(false, expect.any(Number), expect.anything())
+  })
+
+  it('fires two wheelRotations events when both deltaX and deltaY are non-zero', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+    const fakeSession = { applyInputs: vi.fn() }
+
+    attachInputHandlers(canvas, () => fakeSession as unknown as import('ironrdp-wasm').IronRdpSession, api)
+    const handlers = canvas._listeners.get('wheel') ?? []
+
+    handlers[0](new WheelEvent('wheel', { deltaY: 120, deltaX: 80 }))
+    expect(api.DeviceEvent.wheelRotations).toHaveBeenCalledTimes(2)
+    expect(fakeSession.applyInputs).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not fire wheelRotations when deltaX and deltaY are both zero', () => {
+    const canvas = makeCanvas()
+    const api = makeIronRdpApi()
+
+    attachInputHandlers(canvas, () => null, api)
+    const handlers = canvas._listeners.get('wheel') ?? []
+
+    handlers[0](new WheelEvent('wheel', { deltaY: 0, deltaX: 0 }))
+    expect(api.DeviceEvent.wheelRotations).not.toHaveBeenCalled()
+  })
+
+  it('contextmenu handler calls preventDefault without throwing', () => {
+    const canvas = makeCanvas()
+    attachInputHandlers(canvas, () => null, makeIronRdpApi())
+
+    const handlers = canvas._listeners.get('contextmenu') ?? []
+    const event = new MouseEvent('contextmenu')
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+    expect(() => handlers[0](event)).not.toThrow()
+    expect(preventDefaultSpy).toHaveBeenCalled()
+  })
+
   it('does not forward events when session is null', () => {
     const canvas = makeCanvas()
     const api = makeIronRdpApi()
@@ -152,10 +277,9 @@ describe('attachInputHandlers: input event forwarding', () => {
     const handlers = canvas._listeners.get('keydown') ?? []
 
     handlers[0](new KeyboardEvent('keydown', { code: 'Enter' }))
-    // DeviceEvent.keyPressed called but applyInputs never reached since session is null
     expect(api.DeviceEvent.keyPressed).toHaveBeenCalled()
-    // No session — InputTransaction should not have applyInputs called via session
-    // (the applyEvent helper returns early before calling session.applyInputs)
+    // applyEvent returns early when session is null — no InputTransaction created
+    expect(api.InputTransaction).not.toHaveBeenCalled()
   })
 })
 

@@ -28,9 +28,16 @@ declare module 'ironrdp-wasm' {
 
   export interface IronRdpSession {
     desktopSize(): DesktopSize
+    resize(width: number, height: number): void
     run(): Promise<SessionEndInfo>
     shutdown(): void
     applyInputs(transaction: InputTransaction): void
+  }
+
+  export enum RotationUnit {
+    Pixel = 0,
+    Line = 1,
+    Page = 2,
   }
 
   export class SessionBuilder {
@@ -47,5 +54,6 @@ declare module 'ironrdp-wasm' {
     connect(): Promise<IronRdpSession>
   }
 
-  export default function initIronRdp(): Promise<void>
+  export function setup(log_level: string): void
+  export default function initIronRdp(module_or_path?: string | URL): Promise<void>
 }

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ConnectionProfile, Host, HostInput, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
-import { HOST_LOG_VERBOSITY_OPTIONS, normalizeHttpEndpoint, parseTagsInput } from '@consoleri/core'
+import type { ConnectionProfile, Host, HostLogVerbosity, OsType, ProfileInput, UxProfile } from '@shared/types'
+import {
+  HOST_LOG_VERBOSITY_OPTIONS,
+  normalizeHostInput,
+  normalizeHttpEndpoint,
+  parseTagsInput
+} from '@consoleri/core'
+import type { HostFormInput } from '@consoleri/core'
 import { useAppStore } from '../../stores/appStore'
 import { ProfileForm } from '../profiles/ProfileForm'
 import { PickProfileDialog } from '../profiles/PickProfileDialog'
@@ -54,6 +60,7 @@ export function HostForm({
   const [uxProfileId, setUxProfileId] = useState(source?.uxProfileId ?? '')
   const [uxProfiles, setUxProfiles] = useState<UxProfile[]>([])
   const [saving, setSaving] = useState(false)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [httpEndpointError, setHttpEndpointError] = useState<string | null>(null)
   const [pendingProfiles, setPendingProfiles] = useState<PendingProfile[]>(
     initialPendingProfiles ?? []
@@ -75,6 +82,7 @@ export function HostForm({
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
+    setFormErrors({})
     setHttpEndpointError(null)
     let normalizedHttpEndpoint: string | null
     try {
@@ -85,7 +93,7 @@ export function HostForm({
     }
     setSaving(true)
     try {
-      const input: HostInput = {
+      const rawHostInput: HostFormInput = {
         name,
         hostname,
         port,
@@ -100,10 +108,16 @@ export function HostForm({
         groupId: copyFrom?.groupId ?? null
       }
 
+      const { errors: hostErrors, normalized: normalizedHost } = normalizeHostInput(rawHostInput)
+      if (!normalizedHost) {
+        setFormErrors(hostErrors)
+        return
+      }
+
       if (host) {
-        await window.consoleri.hosts.update(host.id, input)
+        await window.consoleri.hosts.update(host.id, normalizedHost)
       } else {
-        const savedHost = await window.consoleri.hosts.create(input)
+        const savedHost = await window.consoleri.hosts.create(normalizedHost)
         await applyPendingProfiles(pendingProfiles, savedHost.id)
 
         const sourceDefaultProfileId = copyFrom?.defaultProfileId
@@ -158,6 +172,8 @@ export function HostForm({
     setPendingProfiles((prev) => prev.filter((p) => p.key !== key))
   }
 
+  const formErrorEntries = Object.entries(formErrors)
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-3 p-4 text-sm">
@@ -165,6 +181,13 @@ export function HostForm({
           <h3 className="text-base font-medium text-gray-200">
             {isCopyMode ? 'Copy host' : 'Add host'}
           </h3>
+        )}
+        {formErrorEntries.length > 0 && (
+          <ul className="rounded border border-red-800 bg-red-950/40 px-3 py-2 text-xs text-red-400">
+            {formErrorEntries.map(([field, msg]) => (
+              <li key={field}>{msg}</li>
+            ))}
+          </ul>
         )}
         <label className="block">
           <span className="text-gray-400">Name</span>

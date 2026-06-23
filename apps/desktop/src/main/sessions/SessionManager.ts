@@ -1,9 +1,10 @@
 import { nanoid } from 'nanoid'
 import type { BrowserWindow } from 'electron'
 import { isTerminalProtocol } from '@consoleri/core'
-import type { OpenSessionRequest, SessionInfo, SessionStatus } from '../../shared/types'
+import type { OpenSessionRequest, Protocol, SessionInfo, SessionStatus } from '../../shared/types'
 import { IPC_CHANNELS } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 import { credentialResolver } from '../services/CredentialResolver'
 import { connectionLog } from './ConnectionLog'
 import { sessionFactory } from './SessionFactory'
@@ -11,6 +12,7 @@ import type { ITransport } from './Transport'
 import { RdpProxy } from './rdp/RdpProxy'
 import { VncProxy } from './VncProxy'
 import { formatSessionWindowTitle } from '../windowTitles'
+import { getRegisteredSessionWindow } from '../windows/SessionWindowRegistry'
 
 interface ManagedSession {
   info: SessionInfo
@@ -21,11 +23,28 @@ interface ManagedSession {
   connecting?: boolean
 }
 
+interface TransportResult {
+  transport: ITransport
+  rdpProxy?: RdpProxy
+  vncProxy?: VncProxy
+  protocol: Protocol
+  title: string
+  proxyUrl?: string
+  rdpDestination?: string
+}
+
 export class SessionManager {
   private sessions = new Map<string, ManagedSession>()
   private window: BrowserWindow | null = null
   private logWindow: BrowserWindow | null = null
-  private sessionWindows = new Map<string, BrowserWindow>()
+
+  constructor(
+    private readonly _hostRepository = hostRepository,
+    private readonly _profileRepository = profileRepository,
+    private readonly _credentialResolver = credentialResolver,
+    private readonly _connectionLog = connectionLog,
+    private readonly _sessionFactory = sessionFactory
+  ) {}
 
   setWindow(win: BrowserWindow): void {
     this.window = win
@@ -52,8 +71,8 @@ export class SessionManager {
 
     const sessionId = this.extractSessionId(channel, payload)
     if (sessionId) {
-      const sessionWin = this.sessionWindows.get(sessionId)
-      if (sessionWin && !sessionWin.isDestroyed()) {
+      const sessionWin = getRegisteredSessionWindow(sessionId)
+      if (sessionWin) {
         sessionWin.webContents.send(channel, payload)
       }
     }
@@ -75,24 +94,16 @@ export class SessionManager {
     return null
   }
 
-  registerSessionWindow(sessionId: string, win: BrowserWindow): void {
-    this.sessionWindows.set(sessionId, win)
-  }
-
-  unregisterSessionWindow(sessionId: string): void {
-    this.sessionWindows.delete(sessionId)
-  }
-
   private updateSessionWindowTitle(sessionId: string): void {
-    const win = this.sessionWindows.get(sessionId)
+    const win = getRegisteredSessionWindow(sessionId)
     const session = this.sessions.get(sessionId)
-    if (win && !win.isDestroyed() && session) {
+    if (win && session) {
       win.setTitle(formatSessionWindowTitle(session.info))
     }
   }
 
   private appendLog(sessionId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
-    const entry = connectionLog.append(sessionId, level, message)
+    const entry = this._connectionLog.append(sessionId, level, message)
     if (entry) this.send(IPC_CHANNELS.sessionLog, entry)
   }
 
@@ -121,6 +132,24 @@ export class SessionManager {
     })
   }
 
+  private applyTransportResult(managed: ManagedSession, sessionId: string, result: TransportResult): void {
+    managed.transport = result.transport
+    managed.rdpProxy = result.rdpProxy
+    managed.vncProxy = result.vncProxy
+    managed.info.protocol = result.protocol
+    managed.info.title = result.title
+    managed.info.proxyUrl = result.proxyUrl
+    managed.info.rdpDestination = result.rdpDestination
+    managed.info.status = 'connected'
+    managed.connecting = false
+
+    if (isTerminalProtocol(result.protocol)) {
+      this.attachTransport(sessionId, result.transport)
+    }
+    this.updateStatus(sessionId, 'connected')
+    this.updateSessionWindowTitle(sessionId)
+  }
+
   open(request: OpenSessionRequest, cols = 80, rows = 24): SessionInfo {
     const id = nanoid()
     const info: SessionInfo = {
@@ -140,10 +169,10 @@ export class SessionManager {
     })
 
     if (request.hostId) {
-      const host = hostRepository.getHost(request.hostId)
-      if (host) connectionLog.setSessionVerbosity(id, host.logVerbosity)
+      const host = this._hostRepository.getHost(request.hostId)
+      if (host) this._connectionLog.setSessionVerbosity(id, host.logVerbosity)
     } else {
-      connectionLog.setSessionVerbosity(id, 'info')
+      this._connectionLog.setSessionVerbosity(id, 'info')
     }
 
     this.appendLog(id, 'info', 'Session requested')
@@ -161,26 +190,10 @@ export class SessionManager {
     if (!managed) return
 
     try {
-      const result = await sessionFactory.createTransport(id, request, cols, rows)
+      const result = await this._sessionFactory.createTransport(id, request, cols, rows)
       if (!this.sessions.has(id)) return
-
-      managed.transport = result.transport
-      managed.rdpProxy = result.rdpProxy
-      managed.vncProxy = result.vncProxy
-      managed.info.protocol = result.protocol
-      managed.info.title = result.title
-      managed.info.proxyUrl = result.proxyUrl
-      managed.info.rdpDestination = result.rdpDestination
-      managed.info.status = 'connected'
-      managed.connecting = false
-
       this.appendLog(id, 'info', 'Session connected')
-
-      if (isTerminalProtocol(result.protocol)) {
-        this.attachTransport(id, result.transport)
-      }
-      this.updateStatus(id, 'connected')
-      this.updateSessionWindowTitle(id)
+      this.applyTransportResult(managed, id, result)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.appendLog(id, 'error', message)
@@ -200,31 +213,17 @@ export class SessionManager {
     existing.rdpProxy = undefined
     existing.vncProxy = undefined
 
-    connectionLog.clear(sessionId)
+    this._connectionLog.clear(sessionId)
     if (request.hostId) {
-      const host = hostRepository.getHost(request.hostId)
-      if (host) connectionLog.setSessionVerbosity(sessionId, host.logVerbosity)
+      const host = this._hostRepository.getHost(request.hostId)
+      if (host) this._connectionLog.setSessionVerbosity(sessionId, host.logVerbosity)
     }
     this.updateStatus(sessionId, 'connecting')
     this.appendLog(sessionId, 'info', 'Reconnecting…')
 
     try {
-      const result = await sessionFactory.createTransport(sessionId, request, cols, rows)
-      existing.transport = result.transport
-      existing.rdpProxy = result.rdpProxy
-      existing.vncProxy = result.vncProxy
-      existing.info.protocol = result.protocol
-      existing.info.title = result.title
-      existing.info.proxyUrl = result.proxyUrl
-      existing.info.rdpDestination = result.rdpDestination
-      existing.info.status = 'connected'
-      existing.connecting = false
-
-      if (isTerminalProtocol(result.protocol)) {
-        this.attachTransport(sessionId, result.transport)
-      }
-      this.updateStatus(sessionId, 'connected')
-      this.updateSessionWindowTitle(sessionId)
+      const result = await this._sessionFactory.createTransport(sessionId, request, cols, rows)
+      this.applyTransportResult(existing, sessionId, result)
       return existing.info
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -253,16 +252,15 @@ export class SessionManager {
     session.transport?.disconnect()
     session.rdpProxy?.stop()
     session.vncProxy?.stop()
-    connectionLog.removeSession(sessionId)
+    this._connectionLog.removeSession(sessionId)
     this.sessions.delete(sessionId)
     this.send(IPC_CHANNELS.sessionExit, { id: sessionId, code: 0 })
 
-    const sessionWin = this.sessionWindows.get(sessionId)
-    if (sessionWin && !sessionWin.isDestroyed()) {
+    const sessionWin = getRegisteredSessionWindow(sessionId)
+    if (sessionWin) {
       sessionWin.removeAllListeners('closed')
       sessionWin.close()
     }
-    this.sessionWindows.delete(sessionId)
   }
 
   closeAll(): void {
@@ -272,7 +270,7 @@ export class SessionManager {
   }
 
   getLogEntries(sessionId: string) {
-    return connectionLog.getEntries(sessionId)
+    return this._connectionLog.getEntries(sessionId)
   }
 
   appendSessionLog(
@@ -289,7 +287,7 @@ export class SessionManager {
     message: string,
     meta?: Record<string, unknown>
   ): void {
-    const entry = connectionLog.append(logId, level, message, meta)
+    const entry = this._connectionLog.append(logId, level, message, meta)
     if (entry) this.send(IPC_CHANNELS.sessionLog, entry)
   }
 
@@ -298,16 +296,16 @@ export class SessionManager {
   }
 
   async getCredentialsForRdp(profileId: string): Promise<{ username: string; password: string } | null> {
-    const profile = hostRepository.getProfile(profileId)
+    const profile = this._profileRepository.getProfile(profileId)
     if (!profile) return null
-    const password = await credentialResolver.resolvePassword(profile)
+    const password = await this._credentialResolver.resolvePassword(profile)
     return { username: profile.username ?? '', password: password ?? '' }
   }
 
   async getCredentialsForVnc(profileId: string): Promise<string | null> {
-    const profile = hostRepository.getProfile(profileId)
+    const profile = this._profileRepository.getProfile(profileId)
     if (!profile) return null
-    return credentialResolver.resolvePassword(profile)
+    return this._credentialResolver.resolvePassword(profile)
   }
 }
 

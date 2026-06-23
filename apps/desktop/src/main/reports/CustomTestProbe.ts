@@ -1,4 +1,4 @@
-import type { CustomTestCommand, CustomTestHostResult } from '@consoleri/core'
+import type { CustomTestHostResult } from '@consoleri/core'
 import { execSshCommand } from '../sessions/SshConnectHelper'
 import { sshReportConnection } from './SshReportConnection'
 import type { CustomTestProbeOptions, ReportProbe } from './ReportProbe'

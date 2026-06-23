@@ -61,19 +61,29 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-// ── Import store AFTER globals are set up ─────────────────────────────────────
-// We import dynamically per test to get a fresh Zustand store state.
-// The store module is reset via vi.resetModules().
-async function freshStore() {
+// ── Fresh store helpers ───────────────────────────────────────────────────────
+async function freshAppStore() {
   vi.resetModules()
   const mod = await import('./appStore')
+  return mod
+}
+
+async function freshSessionWorkspaceStore() {
+  vi.resetModules()
+  const mod = await import('./sessionWorkspaceStore')
+  return mod
+}
+
+async function freshPreferencesStore() {
+  vi.resetModules()
+  const mod = await import('./preferencesStore')
   return mod
 }
 
 // ── syncHostListViewFields: denormalized state ───────────────────────────────
 describe('syncHostListViewFields denormalization', () => {
   it('setSelectedTags syncs selectedTags from hostListView', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     useAppStore.getState().setSelectedTags(['web', 'prod'])
     const state = useAppStore.getState()
     expect(state.selectedTags).toEqual(['web', 'prod'])
@@ -81,7 +91,7 @@ describe('syncHostListViewFields denormalization', () => {
   })
 
   it('setSelectedGroupId syncs selectedGroupId from hostListView', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     useAppStore.getState().setSelectedGroupId('group-1')
     const state = useAppStore.getState()
     expect(state.selectedGroupId).toBe('group-1')
@@ -89,15 +99,15 @@ describe('syncHostListViewFields denormalization', () => {
   })
 
   it('setGroupBy syncs groupBy from hostListView', async () => {
-    const { useAppStore } = await freshStore()
-    useAppStore.getState().setGroupBy('group')
+    const { useAppStore } = await freshAppStore()
+    useAppStore.getState().setGroupBy('tag')
     const state = useAppStore.getState()
-    expect(state.groupBy).toBe('group')
-    expect(state.hostListView.groupBy).toBe('group')
+    expect(state.groupBy).toBe('tag')
+    expect(state.hostListView.groupBy).toBe('tag')
   })
 
   it('setSortBy/setSortDir sync via hostListView', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     useAppStore.getState().setSortBy('name')
     useAppStore.getState().setSortDir('desc')
     const state = useAppStore.getState()
@@ -108,7 +118,7 @@ describe('syncHostListViewFields denormalization', () => {
   })
 
   it('toggleCollapsedSection adds and then removes a section', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     useAppStore.getState().toggleCollapsedSection('sec-1')
     expect(useAppStore.getState().collapsedSections).toContain('sec-1')
     useAppStore.getState().toggleCollapsedSection('sec-1')
@@ -116,7 +126,7 @@ describe('syncHostListViewFields denormalization', () => {
   })
 
   it('setSelectedHostId syncs selectedHostId', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     useAppStore.getState().setSelectedHostId('host-42')
     expect(useAppStore.getState().selectedHostId).toBe('host-42')
     expect(useAppStore.getState().hostListView.selectedHostId).toBe('host-42')
@@ -126,8 +136,7 @@ describe('syncHostListViewFields denormalization', () => {
 // ── hostListView debounced persistence ───────────────────────────────────────
 describe('hostListView debounced persistence', () => {
   it('does NOT call setHostListView immediately on mutation', async () => {
-    const { useAppStore } = await freshStore()
-    // loadHostListView must have been called first to set hostListViewReady=true
+    const { useAppStore } = await freshAppStore()
     mockPreferencesGetHostListView.mockResolvedValue({
       version: 1,
       groupBy: 'none',
@@ -146,7 +155,7 @@ describe('hostListView debounced persistence', () => {
   })
 
   it('calls setHostListView after debounce delay', async () => {
-    const { useAppStore } = await freshStore()
+    const { useAppStore } = await freshAppStore()
     mockPreferencesGetHostListView.mockResolvedValue({
       version: 1,
       groupBy: 'none',
@@ -169,21 +178,21 @@ describe('hostListView debounced persistence', () => {
 // ── persistWorkspace: debounce vs immediate ──────────────────────────────────
 describe('persistWorkspace', () => {
   it('calls workspace.save immediately when debounce is false', async () => {
-    const { useAppStore } = await freshStore()
-    useAppStore.getState().persistWorkspace(null, [])
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
+    useSessionWorkspaceStore.getState().persistWorkspace(null, [])
     expect(mockWorkspaceSave).toHaveBeenCalledOnce()
   })
 
   it('defers workspace.save when debounce is true', async () => {
-    const { useAppStore } = await freshStore()
-    useAppStore.getState().persistWorkspace(null, [], { debounce: true })
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
+    useSessionWorkspaceStore.getState().persistWorkspace(null, [], { debounce: true })
     expect(mockWorkspaceSave).not.toHaveBeenCalled()
     vi.runAllTimers()
     expect(mockWorkspaceSave).toHaveBeenCalledOnce()
   })
 
   it('updates workspace state synchronously even with debounce', async () => {
-    const { useAppStore } = await freshStore()
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
     const panes = [
       {
         paneId: 'p1',
@@ -193,16 +202,16 @@ describe('persistWorkspace', () => {
         connectRequest: {}
       }
     ]
-    useAppStore.getState().persistWorkspace(null, panes, { debounce: true })
-    expect(useAppStore.getState().workspace.panes).toHaveLength(1)
+    useSessionWorkspaceStore.getState().persistWorkspace(null, panes, { debounce: true })
+    expect(useSessionWorkspaceStore.getState().workspace.panes).toHaveLength(1)
   })
 })
 
 // ── flushWorkspacePersist ─────────────────────────────────────────────────────
 describe('flushWorkspacePersist', () => {
   it('flushes any pending debounced save immediately', async () => {
-    const { useAppStore, flushWorkspacePersist } = await freshStore()
-    useAppStore.getState().persistWorkspace(null, [], { debounce: true })
+    const { useSessionWorkspaceStore, flushWorkspacePersist } = await freshSessionWorkspaceStore()
+    useSessionWorkspaceStore.getState().persistWorkspace(null, [], { debounce: true })
     expect(mockWorkspaceSave).not.toHaveBeenCalled()
     flushWorkspacePersist()
     expect(mockWorkspaceSave).toHaveBeenCalledOnce()
@@ -212,15 +221,15 @@ describe('flushWorkspacePersist', () => {
 // ── settings: load / persist ──────────────────────────────────────────────────
 describe('settings load/persist', () => {
   it('loads defaults when localStorage is empty', async () => {
-    const { useAppStore } = await freshStore()
-    const { settings } = useAppStore.getState()
+    const { usePreferencesStore } = await freshPreferencesStore()
+    const { settings } = usePreferencesStore.getState()
     expect(settings.autoOpenConnectionLog).toBe(false)
     expect(settings.sessionOpenMode).toBe('workspace')
   })
 
   it('persists settings to localStorage when changed', async () => {
-    const { useAppStore } = await freshStore()
-    useAppStore.getState().setAutoOpenConnectionLog(true)
+    const { usePreferencesStore } = await freshPreferencesStore()
+    usePreferencesStore.getState().setAutoOpenConnectionLog(true)
     expect(mockLocalStorage.setItem).toHaveBeenCalled()
     const raw = mockLocalStorage.setItem.mock.calls.at(-1)?.[1] as string
     expect(JSON.parse(raw).autoOpenConnectionLog).toBe(true)
@@ -228,74 +237,53 @@ describe('settings load/persist', () => {
 
   it('reads persisted autoOpenConnectionLog from localStorage on load', async () => {
     storage.set('consoleri.settings', JSON.stringify({ autoOpenConnectionLog: true, sessionOpenMode: 'workspace' }))
-    const { useAppStore } = await freshStore()
-    expect(useAppStore.getState().settings.autoOpenConnectionLog).toBe(true)
+    const { usePreferencesStore } = await freshPreferencesStore()
+    expect(usePreferencesStore.getState().settings.autoOpenConnectionLog).toBe(true)
   })
 
   it('normalizes unknown sessionOpenMode to workspace', async () => {
     storage.set('consoleri.settings', JSON.stringify({ sessionOpenMode: 'invalid' }))
-    const { useAppStore } = await freshStore()
-    expect(useAppStore.getState().settings.sessionOpenMode).toBe('workspace')
+    const { usePreferencesStore } = await freshPreferencesStore()
+    expect(usePreferencesStore.getState().settings.sessionOpenMode).toBe('workspace')
   })
 
   it('accepts window sessionOpenMode value', async () => {
     storage.set('consoleri.settings', JSON.stringify({ sessionOpenMode: 'window' }))
-    const { useAppStore } = await freshStore()
-    expect(useAppStore.getState().settings.sessionOpenMode).toBe('window')
+    const { usePreferencesStore } = await freshPreferencesStore()
+    expect(usePreferencesStore.getState().settings.sessionOpenMode).toBe('window')
   })
 })
 
 // ── sessions state ────────────────────────────────────────────────────────────
 describe('sessions state management', () => {
   it('addSession appends to sessions array', async () => {
-    const { useAppStore } = await freshStore()
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
     const session = { id: 's1', protocol: 'ssh' as const, title: 'web01', status: 'connected' as const, hostId: null, profileId: null }
-    useAppStore.getState().addSession(session)
-    expect(useAppStore.getState().sessions).toHaveLength(1)
+    useSessionWorkspaceStore.getState().addSession(session)
+    expect(useSessionWorkspaceStore.getState().sessions).toHaveLength(1)
   })
 
   it('updateSession patches a session by id', async () => {
-    const { useAppStore } = await freshStore()
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
     const session = { id: 's1', protocol: 'ssh' as const, title: 'web01', status: 'connecting' as const, hostId: null, profileId: null }
-    useAppStore.getState().addSession(session)
-    useAppStore.getState().updateSession('s1', { status: 'connected' })
-    expect(useAppStore.getState().sessions[0].status).toBe('connected')
+    useSessionWorkspaceStore.getState().addSession(session)
+    useSessionWorkspaceStore.getState().updateSession('s1', { status: 'connected' })
+    expect(useSessionWorkspaceStore.getState().sessions[0].status).toBe('connected')
   })
 
   it('removeSession removes a session by id', async () => {
-    const { useAppStore } = await freshStore()
+    const { useSessionWorkspaceStore } = await freshSessionWorkspaceStore()
     const session = { id: 's1', protocol: 'ssh' as const, title: 'web01', status: 'connected' as const, hostId: null, profileId: null }
-    useAppStore.getState().addSession(session)
-    useAppStore.getState().removeSession('s1')
-    expect(useAppStore.getState().sessions).toHaveLength(0)
-  })
-})
-
-// ── profiles: dead state ──────────────────────────────────────────────────────
-describe('profiles is dead state (no action mutates it)', () => {
-  it('profiles starts as an empty array', async () => {
-    const { useAppStore } = await freshStore()
-    expect(useAppStore.getState().profiles).toEqual([])
-  })
-
-  it('setProfiles directly assigns profiles but no other action touches it', async () => {
-    const { useAppStore } = await freshStore()
-    const profiles = [{ id: 'p1', name: 'ssh', protocol: 'ssh' as const, shell: null, username: null, authMethod: 'password' as const, credentialRef: null, jumpHostId: null, extra: {} }]
-    useAppStore.getState().setProfiles(profiles)
-    expect(useAppStore.getState().profiles).toHaveLength(1)
-
-    // No side actions (setSelectedTags, addSession, etc.) touch profiles
-    useAppStore.getState().setSelectedTags(['x'])
-    useAppStore.getState().addSession({ id: 's1', protocol: 'ssh', title: 't', status: 'connected', hostId: null, profileId: null })
-    expect(useAppStore.getState().profiles).toHaveLength(1)
+    useSessionWorkspaceStore.getState().addSession(session)
+    useSessionWorkspaceStore.getState().removeSession('s1')
+    expect(useSessionWorkspaceStore.getState().sessions).toHaveLength(0)
   })
 })
 
 // ── mapView sync ──────────────────────────────────────────────────────────────
 describe('mapView state sync', () => {
   it('setAppView updates both appView and mapView.appView', async () => {
-    const { useAppStore } = await freshStore()
-    // Need loadMapView first so mapViewReady=true
+    const { useAppStore } = await freshAppStore()
     mockPreferencesGetMapView.mockResolvedValue({ version: 1, appView: 'list', mapMode: 'logical' })
     await useAppStore.getState().loadMapView()
 

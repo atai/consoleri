@@ -253,3 +253,4 @@ describe('session change resets counters', () => {
     expect(result.current.attemptsDone).toBe(0)
   })
 })
+

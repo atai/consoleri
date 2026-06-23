@@ -3,17 +3,21 @@ import { nanoid } from 'nanoid'
 import { insertPaneIntoLayout, splitPaneInLayout } from '@consoleri/core'
 import type { MosaicNode as CoreMosaicNode } from '@consoleri/core'
 import type { OpenSessionRequest, PaneBinding, SessionInfo } from '@shared/types'
-import { useAppStore } from '../stores/appStore'
+import { useSessionWorkspaceStore } from '../stores/sessionWorkspaceStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
+import { getConsoleriApi } from '../api'
 import { releaseTerminal } from '../terminal/TerminalPool'
 
 export async function openSession(request: OpenSessionRequest): Promise<SessionInfo | null> {
-  const { addSession, settings } = useAppStore.getState()
-  const session = await window.consoleri.sessions.open(request)
+  const api = getConsoleriApi()
+  const { addSession } = useSessionWorkspaceStore.getState()
+  const { settings } = usePreferencesStore.getState()
+  const session = await api.sessions.open(request)
 
   if (session.status === 'error') {
     alert(session.error ?? 'Connection failed')
     if (settings.autoOpenConnectionLog) {
-      void window.consoleri.sessions.openLogWindow(session.id)
+      void api.sessions.openLogWindow(session.id)
     }
     return null
   }
@@ -21,7 +25,7 @@ export async function openSession(request: OpenSessionRequest): Promise<SessionI
   addSession(session)
 
   if (settings.autoOpenConnectionLog && session.status === 'connecting') {
-    void window.consoleri.sessions.openLogWindow(session.id)
+    void api.sessions.openLogWindow(session.id)
   }
 
   return session
@@ -42,7 +46,7 @@ export async function addSessionToWorkspace(
   connectRequest: OpenSessionRequest
 ): Promise<void> {
   const binding = createBinding(session, connectRequest)
-  const { workspace, persistWorkspace } = useAppStore.getState()
+  const { workspace, persistWorkspace } = useSessionWorkspaceStore.getState()
   const panes = [...workspace.panes, binding]
   const currentLayout = workspace.layout as MosaicNode<string> | null
   const nextLayout = insertPaneIntoLayout(
@@ -56,7 +60,7 @@ export async function splitPaneInWorkspace(
   sourcePaneId: string,
   direction: 'row' | 'column'
 ): Promise<void> {
-  const { workspace, persistWorkspace } = useAppStore.getState()
+  const { workspace, persistWorkspace } = useSessionWorkspaceStore.getState()
   const sourceBinding = workspace.panes.find((p) => p.paneId === sourcePaneId)
   if (!sourceBinding) return
 
@@ -79,7 +83,7 @@ export async function splitPaneInWorkspace(
 }
 
 export async function connectPane(paneId: string): Promise<void> {
-  const { workspace, persistWorkspace } = useAppStore.getState()
+  const { workspace, persistWorkspace, removeSession } = useSessionWorkspaceStore.getState()
   const binding = workspace.panes.find((p) => p.paneId === paneId)
   if (!binding) return
 
@@ -87,9 +91,9 @@ export async function connectPane(paneId: string): Promise<void> {
   if (!session) return
 
   if (binding.sessionId) {
-    window.consoleri.sessions.close(binding.sessionId)
+    getConsoleriApi().sessions.close(binding.sessionId)
     releaseTerminal(binding.sessionId)
-    useAppStore.getState().removeSession(binding.sessionId)
+    removeSession(binding.sessionId)
   }
 
   const panes = workspace.panes.map((p) =>
@@ -97,6 +101,7 @@ export async function connectPane(paneId: string): Promise<void> {
   )
   persistWorkspace(workspace.layout as MosaicNode<string> | null, panes)
 }
+
 
 export async function openSessionAndAddToWorkspace(request: OpenSessionRequest): Promise<void> {
   const session = await openSession(request)

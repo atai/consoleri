@@ -1,6 +1,6 @@
 {
   "name": "consoleri",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Consoleri — remote host console manager",
   "packageManager": "pnpm@10.12.1",
@@ -15,6 +15,10 @@
     "rebuild-native": "node scripts/rebuild-native.mjs",
     "install:electron": "node node_modules/electron/install.js",
     "postinstall": "node scripts/postinstall.mjs",
+    "version:patch": "node scripts/bump-version.mjs patch",
+    "version:minor": "node scripts/bump-version.mjs minor",
+    "version:major": "node scripts/bump-version.mjs major",
+    "version:set": "node scripts/bump-version.mjs",
     "release": "bash scripts/release.sh"
   },
   "engines": {

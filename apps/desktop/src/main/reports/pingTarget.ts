@@ -3,6 +3,7 @@ import type { ReportHostStatus } from '@consoleri/core'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 import {
   credentialResolver,
   findSshProfile,
@@ -79,7 +80,7 @@ async function connectJumpHost(
     return { ok: false, error, log }
   }
 
-  const jumpProfiles = hostRepository.listProfiles(jumpHostId)
+  const jumpProfiles = profileRepository.listProfiles(jumpHostId)
   const jumpProfile = findSshProfile(jumpProfiles, null)
   if (!jumpProfile) {
     const error = 'Jump host has no SSH profile'

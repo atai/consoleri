@@ -3,7 +3,8 @@ import type { PaneBinding, SessionInfo } from '@shared/types'
 import { TerminalPane } from '../terminal/TerminalPane'
 import { RdpPane } from '../rdp/RdpPane'
 import { VncPane } from '../vnc/VncPane'
-import { useAutoReconnect } from './useAutoReconnect'
+import { useAutoReconnect } from '../../hooks/useAutoReconnect'
+import type { AutoReconnectHook } from '../../hooks/useAutoReconnect'
 
 export interface SessionViewProps {
   session: SessionInfo | undefined

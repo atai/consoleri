@@ -5,13 +5,13 @@ import { ironrdpWasmPlugin } from './src/renderer/plugins/ironrdpWasmPlugin'
 export default defineConfig({
   test: {
     environment: 'jsdom',
-    include: ['src/renderer/**/*.test.ts'],
+    include: ['src/renderer/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       all: true,
       include: ['src/renderer/src/**/*.{ts,tsx}'],
       exclude: [
-        '**/*.test.ts',
+        '**/*.test.{ts,tsx}',
         '**/*.d.ts',
         '**/index.ts',
         '**/types.ts'

@@ -206,7 +206,7 @@ describe('TerminalService', () => {
     service.attachInput('session-a')
 
     const entry = service.getTerminal('session-a')!
-    ;(entry.term as { emitData: (data: string) => void }).emitData('ls')
+    ;(entry.term as unknown as { emitData: (data: string) => void }).emitData('ls')
 
     expect(api.write).toHaveBeenCalledWith('session-a', 'ls')
   })

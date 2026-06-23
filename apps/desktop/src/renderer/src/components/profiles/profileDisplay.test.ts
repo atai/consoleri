@@ -14,7 +14,7 @@ const hosts: Host[] = [
     notes: '',
     defaultProfileId: null,
     uxProfileId: null,
-    logVerbosity: 'normal',
+    logVerbosity: 'info',
     relatedHostIds: [],
     gatewayHostId: null,
     httpEndpoint: null,

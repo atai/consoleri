@@ -4,7 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { APP_NAME, appIconPath } from './appBranding'
 import { getDatabase, closeDatabase } from './db/database'
 import { registerIpcHandlers } from './ipc/register'
-import { sessionManager } from './sessions/SessionManager'
+import { sessionManager } from './compositionRoot'
 
 let mainWindow: BrowserWindow | null = null
 

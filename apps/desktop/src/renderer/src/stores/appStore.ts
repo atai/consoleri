@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import type { MosaicNode } from 'react-mosaic-component'
 import {
   hostListViewToGroupFilter,
   MAX_SIDEBAR_WIDTH,
@@ -13,53 +12,15 @@ import {
   type MapViewMode,
   type MapViewSettings
 } from '@consoleri/core'
-import type { Host, HostGroup, ConnectionProfile, SessionInfo, WorkspaceState, PaneBinding } from '@shared/types'
+import type { Host, HostGroup } from '@shared/types'
 
-const SETTINGS_KEY = 'consoleri.settings'
-const LAYOUT_SAVE_DEBOUNCE_MS = 300
 const HOST_LIST_VIEW_SAVE_DEBOUNCE_MS = 300
 const MAP_VIEW_SAVE_DEBOUNCE_MS = 300
 let sidebarPersistTimer: ReturnType<typeof setTimeout> | null = null
-let layoutSaveTimer: ReturnType<typeof setTimeout> | null = null
 let hostListViewSaveTimer: ReturnType<typeof setTimeout> | null = null
 let mapViewSaveTimer: ReturnType<typeof setTimeout> | null = null
 let hostListViewReady = false
 let mapViewReady = false
-
-export type SessionOpenMode = 'workspace' | 'window'
-
-interface AppSettings {
-  autoOpenConnectionLog: boolean
-  sessionOpenMode: SessionOpenMode
-}
-
-function loadSidebarWidth(): number {
-  return 360
-}
-
-function normalizeSessionOpenMode(value: unknown): SessionOpenMode {
-  return value === 'window' ? 'window' : 'workspace'
-}
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppSettings>
-      return {
-        autoOpenConnectionLog: parsed.autoOpenConnectionLog ?? false,
-        sessionOpenMode: normalizeSessionOpenMode(parsed.sessionOpenMode)
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return { autoOpenConnectionLog: false, sessionOpenMode: 'workspace' }
-}
-
-function persistSettings(settings: AppSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-}
 
 export type SidebarView = 'hosts' | 'keys' | 'profiles'
 
@@ -68,9 +29,6 @@ interface AppState {
   allHosts: Host[]
   allHostTags: string[]
   groups: HostGroup[]
-  profiles: ConnectionProfile[]
-  sessions: SessionInfo[]
-  workspace: WorkspaceState
   hostListView: HostListViewSettings
   hostListViewLoaded: boolean
   mapView: MapViewSettings
@@ -87,7 +45,6 @@ interface AppState {
   sortDir: HostListSortDir
   sidebarWidth: number
   sidebarView: SidebarView
-  settings: AppSettings
   setSearch: (s: string) => void
   setSelectedTags: (tags: string[]) => void
   setSelectedGroupId: (id: HostListGroupFilter) => void
@@ -101,16 +58,8 @@ interface AppState {
   setMapMode: (mode: MapViewMode) => void
   setHosts: (hosts: Host[]) => void
   setGroups: (groups: HostGroup[]) => void
-  setProfiles: (profiles: ConnectionProfile[]) => void
-  addSession: (session: SessionInfo) => void
-  updateSession: (id: string, patch: Partial<SessionInfo>) => void
-  removeSession: (id: string) => void
-  setWorkspace: (ws: WorkspaceState) => void
-  persistWorkspace: (layout: MosaicNode<string> | null, panes: PaneBinding[], options?: { debounce?: boolean }) => void
   setSidebarWidth: (width: number) => void
   setSidebarWidthFromProfile: (width: number) => void
-  setAutoOpenConnectionLog: (value: boolean) => void
-  setSessionOpenMode: (mode: SessionOpenMode) => void
   loadHostListView: () => Promise<void>
   loadMapView: () => Promise<void>
   refreshHosts: () => Promise<void>
@@ -194,9 +143,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   allHosts: [],
   allHostTags: [],
   groups: [],
-  profiles: [],
-  sessions: [],
-  workspace: { layout: null, panes: [] },
   hostListView: {
     version: 1,
     groupBy: 'none',
@@ -224,9 +170,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   collapsedSections: [],
   sortBy: 'name',
   sortDir: 'asc',
-  sidebarWidth: loadSidebarWidth(),
+  sidebarWidth: 360,
   sidebarView: 'hosts',
-  settings: loadSettings(),
   setSearch: (search) => set({ search }),
   setSelectedTags: (selectedTags) => {
     updateHostListView(get, set, { selectedTags })
@@ -262,31 +207,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setHosts: (hosts) => set({ hosts }),
   setGroups: (groups) => set({ groups }),
-  setProfiles: (profiles) => set({ profiles }),
-  addSession: (session) => set({ sessions: [...get().sessions, session] }),
-  updateSession: (id, patch) =>
-    set({
-      sessions: get().sessions.map((s) => (s.id === id ? { ...s, ...patch } : s))
-    }),
-  removeSession: (id) => set({ sessions: get().sessions.filter((s) => s.id !== id) }),
-  setWorkspace: (workspace) => set({ workspace }),
-  persistWorkspace: (layout, panes, options) => {
-    const state: WorkspaceState = { layout, panes }
-    set({ workspace: state })
-    if (options?.debounce) {
-      if (layoutSaveTimer) clearTimeout(layoutSaveTimer)
-      layoutSaveTimer = setTimeout(() => {
-        layoutSaveTimer = null
-        void window.consoleri.workspace.save(state)
-      }, LAYOUT_SAVE_DEBOUNCE_MS)
-      return
-    }
-    if (layoutSaveTimer) {
-      clearTimeout(layoutSaveTimer)
-      layoutSaveTimer = null
-    }
-    void window.consoleri.workspace.save(state)
-  },
   setSidebarWidth: (width) => {
     const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
     set({ sidebarWidth: clamped })
@@ -303,16 +223,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebarWidthFromProfile: (width) => {
     const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
     set({ sidebarWidth: clamped })
-  },
-  setAutoOpenConnectionLog: (autoOpenConnectionLog) => {
-    const settings = { ...get().settings, autoOpenConnectionLog }
-    persistSettings(settings)
-    set({ settings })
-  },
-  setSessionOpenMode: (sessionOpenMode) => {
-    const settings = { ...get().settings, sessionOpenMode }
-    persistSettings(settings)
-    set({ settings })
   },
   loadHostListView: async () => {
     const view = await window.consoleri.preferences.getHostListView()
@@ -365,11 +275,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   }
 }))
 
-export function flushWorkspacePersist(): void {
-  if (layoutSaveTimer) {
-    clearTimeout(layoutSaveTimer)
-    layoutSaveTimer = null
-  }
-  const { workspace } = useAppStore.getState()
-  void window.consoleri.workspace.save(workspace)
-}
+// Re-exports from split stores for consumers that import from appStore
+export { useSessionWorkspaceStore, flushWorkspacePersist } from './sessionWorkspaceStore'
+export { usePreferencesStore, type SessionOpenMode } from './preferencesStore'

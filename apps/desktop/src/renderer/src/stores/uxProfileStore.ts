@@ -3,6 +3,7 @@ import { resolveUxProfile } from '@consoleri/core'
 import type { TerminalAppearance, UxProfile } from '@consoleri/core'
 import { applyAppearanceToAll } from '../terminal/TerminalPool'
 import { useAppStore } from './appStore'
+import { useSessionWorkspaceStore } from './sessionWorkspaceStore'
 
 const LEGACY_SIDEBAR_WIDTH_KEY = 'consoleri.sidebarWidth'
 
@@ -19,7 +20,7 @@ interface UxProfileState {
 }
 
 function applyProfilesToOpenTerminals(): void {
-  const { sessions } = useAppStore.getState()
+  const { sessions } = useSessionWorkspaceStore.getState()
   const resolveTerminalForHost = useUxProfileStore.getState().resolveTerminalForHost
   applyAppearanceToAll(sessions, resolveTerminalForHost)
 }

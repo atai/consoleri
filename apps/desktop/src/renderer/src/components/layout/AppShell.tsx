@@ -8,6 +8,8 @@ import { VaultSettingsPanel } from '../vault/VaultSettingsPanel'
 import { UxProfileManager } from '../ux/UxProfileManager'
 import { ReportsManager } from '../reports/ReportsManager'
 import { useAppStore } from '../../stores/appStore'
+import { useSessionWorkspaceStore } from '../../stores/sessionWorkspaceStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
 import { useUxProfileStore } from '../../stores/uxProfileStore'
 
 interface AppShellProps {
@@ -15,16 +17,9 @@ interface AppShellProps {
 }
 
 export function AppShell({ workspaceReady }: AppShellProps): React.JSX.Element {
-  const {
-    appView,
-    loadMapView,
-    mapViewLoaded,
-    refreshAllHosts,
-    addSession,
-    updateSession,
-    removeSession,
-    settings
-  } = useAppStore()
+  const { appView, loadMapView, mapViewLoaded, refreshAllHosts } = useAppStore()
+  const { addSession, updateSession, removeSession } = useSessionWorkspaceStore()
+  const { settings } = usePreferencesStore()
   const refreshUxProfiles = useUxProfileStore((s) => s.refresh)
   const [bootstrapped, setBootstrapped] = useState(false)
 
@@ -42,7 +37,7 @@ export function AppShell({ workspaceReady }: AppShellProps): React.JSX.Element {
 
   useEffect(() => {
     const unsubExit = window.consoleri.sessions.onExit(({ id }) => {
-      const { workspace } = useAppStore.getState()
+      const { workspace } = useSessionWorkspaceStore.getState()
       const inWorkspace = workspace.panes.some((p) => p.sessionId === id)
       if (inWorkspace) {
         updateSession(id, { status: 'disconnected' })

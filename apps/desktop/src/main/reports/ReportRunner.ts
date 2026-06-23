@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import type { ReportConfig, ReportProgressEvent, ReportResult, ReportType } from '@consoleri/core'
+import type { CustomTestConfig, CustomTestHostResult, ConnectivityTestHostResult, InventoryHostResult, ReportConfig, ReportProgressEvent, ReportResult, ReportType } from '@consoleri/core'
 import { IPC_CHANNELS } from '../../shared/types'
 import { connectivityProbe } from './ConnectivityProbe'
 import { customTestProbe } from './CustomTestProbe'
@@ -44,12 +44,14 @@ async function probeHost(
       return connectivityProbe.probe(hostId, profileId)
     case 'inventory':
       return inventoryProbe.probe(hostId, profileId)
-    case 'custom_test':
+    case 'custom_test': {
+      const customConfig = config as CustomTestConfig
       return customTestProbe.probe(hostId, profileId, {
-        commands: config.commands,
-        continueOnError: config.continueOnError,
+        commands: customConfig.commands,
+        continueOnError: customConfig.continueOnError,
         onCommandProgress
       })
+    }
     default:
       throw new Error(`Unsupported report type: ${type}`)
   }
@@ -62,7 +64,7 @@ export class ReportRunner {
 
     const entries = report.config.entries
     const runAt = new Date().toISOString()
-    const results: ReportResult['entries'] = []
+    const results: Array<ConnectivityTestHostResult | InventoryHostResult | CustomTestHostResult> = []
 
     for (let index = 0; index < entries.length; index++) {
       const entry = entries[index]!

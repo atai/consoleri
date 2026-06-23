@@ -1,6 +1,7 @@
 import { buildRdpDestination, defaultPortForProtocol, resolveRdpPort, resolveUxProfile } from '@consoleri/core'
 import type { ConnectionProfile, Host, OpenSessionRequest, Protocol } from '../../shared/types'
 import { hostRepository } from '../hosts/HostRepository'
+import { profileRepository } from '../hosts/ProfileRepository'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
 import {
   credentialResolver,
@@ -25,7 +26,13 @@ export interface SessionTransportResult {
 }
 
 export class SessionFactory {
-  constructor(private readonly log: ConnectionLog = connectionLog) {}
+  constructor(
+    private readonly _hostRepository = hostRepository,
+    private readonly _profileRepository = profileRepository,
+    private readonly _uxProfileRepository = uxProfileRepository,
+    private readonly _credentialResolver = credentialResolver,
+    private readonly log: ConnectionLog = connectionLog
+  ) {}
 
   resolveContext(request: OpenSessionRequest): {
     host: Host | null
@@ -36,8 +43,8 @@ export class SessionFactory {
     const { host, profile } = resolveHostAndProfile(
       request.hostId,
       request.profileId,
-      (id) => hostRepository.getHost(id),
-      (id) => hostRepository.listProfiles(id)
+      (id) => this._hostRepository.getHost(id),
+      (id) => this._profileRepository.listProfiles(id)
     )
 
     let protocol: Protocol = request.protocol ?? profile?.protocol ?? 'local_pty'
@@ -89,21 +96,21 @@ export class SessionFactory {
     switch (protocol) {
       case 'ssh': {
         if (!profile) throw new Error('SSH profile required')
-        const credentials = await credentialResolver.resolveForProfile(profile)
+        const credentials = await this._credentialResolver.resolveForProfile(profile)
         let jumpHost: Host | null = null
-        let jumpCredentials: Awaited<ReturnType<typeof credentialResolver.resolveForProfile>> | null =
+        let jumpCredentials: Awaited<ReturnType<typeof this._credentialResolver.resolveForProfile>> | null =
           null
         if (profile.jumpHostId) {
-          jumpHost = hostRepository.getHost(profile.jumpHostId)
+          jumpHost = this._hostRepository.getHost(profile.jumpHostId)
           if (!jumpHost) throw new Error(`Jump host not found: ${profile.jumpHostId}`)
-          const jumpProfiles = hostRepository.listProfiles(profile.jumpHostId)
+          const jumpProfiles = this._profileRepository.listProfiles(profile.jumpHostId)
           const jumpProfile = findSshProfile(jumpProfiles, null)
           if (!jumpProfile) throw new Error('Jump host has no SSH profile')
-          jumpCredentials = await credentialResolver.resolveForProfile(jumpProfile)
+          jumpCredentials = await this._credentialResolver.resolveForProfile(jumpProfile)
         }
-        const uxProfile = resolveUxProfile(uxProfileRepository.list(), {
+        const uxProfile = resolveUxProfile(this._uxProfileRepository.list(), {
           hostUxProfileId: host.uxProfileId,
-          activeUxProfileId: uxProfileRepository.getActive().id
+          activeUxProfileId: this._uxProfileRepository.getActive().id
         })
         const transport = await SshSession.create({
           host,

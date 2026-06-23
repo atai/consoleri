@@ -21,6 +21,11 @@ export interface ResolvedCredentials {
 }
 
 export class CredentialResolver {
+  constructor(
+    private readonly _secretBackendService = secretBackendService,
+    private readonly _vaultSettingsRepository = vaultSettingsRepository
+  ) {}
+
   async resolveForProfile(profile: ConnectionProfile): Promise<ResolvedCredentials> {
     const username = profile.username ?? ''
     if (!profile.credentialRef) {
@@ -36,11 +41,11 @@ export class CredentialResolver {
         throw new Error(`Could not read SSH key file: ${keyPath}`)
       }
       const passphrase =
-        (await secretBackendService.retrieve(keyFilePassphraseRef(keyPath))) ?? undefined
+        (await this._secretBackendService.retrieve(keyFilePassphraseRef(keyPath))) ?? undefined
       return { username, privateKey, passphrase }
     }
 
-    const secret = await secretBackendService.retrieve(profile.credentialRef)
+    const secret = await this._secretBackendService.retrieve(profile.credentialRef)
     if (!secret) {
       const backendHint = isVaultRef(profile.credentialRef)
         ? 'Check Vault connectivity and permissions.'
@@ -55,14 +60,14 @@ export class CredentialResolver {
 
   async resolvePassword(profile: ConnectionProfile): Promise<string | null> {
     if (!profile.credentialRef) return null
-    const secret = await secretBackendService.retrieve(profile.credentialRef)
+    const secret = await this._secretBackendService.retrieve(profile.credentialRef)
     if (!secret) return null
     const authType = authTypeFromCredentialRef(profile.credentialRef)
     return authType === 'password' ? secret : null
   }
 
   vaultOptionsForBackend(): { mount: string; prefix: string } {
-    const settings = vaultSettingsRepository.getSettings()
+    const settings = this._vaultSettingsRepository.getSettings()
     return {
       mount: settings.defaultKvMount,
       prefix: settings.secretPathPrefix

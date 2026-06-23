@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { buildHostListSections, type HostListGroupBy, type HostListSortBy } from '@consoleri/core'
 import type { ConnectionProfile, Host } from '@shared/types'
 import { useAppStore } from '../../stores/appStore'
+import { usePreferencesStore } from '../../stores/preferencesStore'
 import { HostActionsMenu } from './HostActionsMenu'
 import { HostForm } from './HostForm'
 import { HostDetailPanel } from './HostDetailPanel'
@@ -44,7 +45,6 @@ export function HostBrowser(): React.JSX.Element {
     sortBy,
     sortDir,
     hostListViewLoaded,
-    settings,
     setSearch,
     setSelectedTags,
     setSelectedGroupId,
@@ -53,14 +53,14 @@ export function HostBrowser(): React.JSX.Element {
     setSortDir,
     toggleCollapsedSection,
     setSelectedHostId,
-    setAutoOpenConnectionLog,
-    setSessionOpenMode,
     loadHostListView,
     refreshHosts,
     refreshAllHostTags,
     refreshAllHosts,
     refreshGroups
   } = useAppStore()
+
+  const { settings, setAutoOpenConnectionLog, setSessionOpenMode } = usePreferencesStore()
 
   const [showForm, setShowForm] = useState(false)
   const [copyFrom, setCopyFrom] = useState<Host | null>(null)

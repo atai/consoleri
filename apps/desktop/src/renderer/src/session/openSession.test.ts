@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionInfo } from '@shared/types'
 
-// ── appStore stub ─────────────────────────────────────────────────────────────
-const { mockAddSession, mockGetState } = vi.hoisted(() => ({
+// ── store stubs ───────────────────────────────────────────────────────────────
+const { mockAddSession, mockWorkspaceGetState, mockPrefsGetState } = vi.hoisted(() => ({
   mockAddSession: vi.fn(),
-  mockGetState: vi.fn()
+  mockWorkspaceGetState: vi.fn(),
+  mockPrefsGetState: vi.fn()
 }))
 
-vi.mock('../stores/appStore', () => ({
-  useAppStore: {
-    getState: mockGetState
-  },
+vi.mock('../stores/sessionWorkspaceStore', () => ({
+  useSessionWorkspaceStore: { getState: mockWorkspaceGetState },
   flushWorkspacePersist: vi.fn()
+}))
+
+vi.mock('../stores/preferencesStore', () => ({
+  usePreferencesStore: { getState: mockPrefsGetState }
 }))
 
 // ── TerminalPool stub ─────────────────────────────────────────────────────────
@@ -59,20 +62,30 @@ function makeSessionInfo(overrides: Partial<SessionInfo> = {}): SessionInfo {
   }
 }
 
-function makeAppState(overrides: object = {}) {
+const mockPersistWorkspace = vi.fn()
+const mockRemoveSession = vi.fn()
+
+function makeWorkspaceState(overrides: object = {}) {
   return {
     addSession: mockAddSession,
-    settings: { autoOpenConnectionLog: false, sessionOpenMode: 'workspace' },
     workspace: { layout: null, panes: [] },
-    persistWorkspace: vi.fn(),
-    removeSession: vi.fn(),
+    persistWorkspace: mockPersistWorkspace,
+    removeSession: mockRemoveSession,
+    ...overrides
+  }
+}
+
+function makePrefsState(overrides: object = {}) {
+  return {
+    settings: { autoOpenConnectionLog: false, sessionOpenMode: 'workspace' },
     ...overrides
   }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockGetState.mockReturnValue(makeAppState())
+  mockWorkspaceGetState.mockReturnValue(makeWorkspaceState())
+  mockPrefsGetState.mockReturnValue(makePrefsState())
 })
 
 afterEach(() => {
@@ -116,8 +129,8 @@ describe('openSession', () => {
     const session = makeSessionInfo({ status: 'error' })
     const api = makeMockConsoleri()
     api.sessions.open.mockResolvedValue(session)
-    mockGetState.mockReturnValue(
-      makeAppState({ settings: { autoOpenConnectionLog: true, sessionOpenMode: 'workspace' } })
+    mockPrefsGetState.mockReturnValue(
+      makePrefsState({ settings: { autoOpenConnectionLog: true, sessionOpenMode: 'workspace' } })
     )
     stubConsoleri(api)
 
@@ -129,8 +142,8 @@ describe('openSession', () => {
     const session = makeSessionInfo({ status: 'connecting' })
     const api = makeMockConsoleri()
     api.sessions.open.mockResolvedValue(session)
-    mockGetState.mockReturnValue(
-      makeAppState({ settings: { autoOpenConnectionLog: true, sessionOpenMode: 'workspace' } })
+    mockPrefsGetState.mockReturnValue(
+      makePrefsState({ settings: { autoOpenConnectionLog: true, sessionOpenMode: 'workspace' } })
     )
     stubConsoleri(api)
 
@@ -176,16 +189,12 @@ describe('openMosaicSession', () => {
   })
 
   it('opens log window on error when autoOpenConnectionLog setting is true', async () => {
-    // openMosaicSession reads from localStorage, not the store
     const session = makeSessionInfo({ status: 'error' })
     const api = makeMockConsoleri()
     api.sessions.open.mockResolvedValue(session)
-
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn(() => JSON.stringify({ autoOpenConnectionLog: true })),
-      setItem: vi.fn(),
-      removeItem: vi.fn()
-    })
+    mockPrefsGetState.mockReturnValue(
+      makePrefsState({ settings: { autoOpenConnectionLog: true, sessionOpenMode: 'workspace' } })
+    )
     vi.stubGlobal('alert', vi.fn())
     stubConsoleri(api)
 

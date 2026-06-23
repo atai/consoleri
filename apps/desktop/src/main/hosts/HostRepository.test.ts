@@ -38,16 +38,31 @@ vi.mock('../vault/VaultSettingsRepository', () => ({
   }
 }))
 
+vi.mock('../ux/UxProfileRepository', () => ({
+  uxProfileRepository: {
+    list: vi.fn(() => [])
+  }
+}))
+
 // ── Test setup ──────────────────────────────────────────────────────────────
 import { HostRepository } from './HostRepository'
+import { ProfileRepository } from './ProfileRepository'
+import { WorkspaceRepository } from './WorkspaceRepository'
+import { HostImportExportService } from './HostImportExportService'
 import { getDatabase } from '../db/database'
 
 let repo: HostRepository
+let profileRepo: ProfileRepository
+let workspaceRepo: WorkspaceRepository
+let importExportService: HostImportExportService
 
 beforeEach(() => {
   setDatabaseForTest(':memory:')
   secretStore.clear()
   repo = new HostRepository()
+  profileRepo = new ProfileRepository()
+  workspaceRepo = new WorkspaceRepository()
+  importExportService = new HostImportExportService(repo, profileRepo)
 })
 
 afterEach(() => {
@@ -189,7 +204,7 @@ describe('groups CRUD', () => {
 // ── Profiles: secret orchestration ──────────────────────────────────────────
 describe('createProfile secret orchestration', () => {
   it('stores password and records credentialRef', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-pass',
       protocol: 'ssh',
       username: 'root',
@@ -200,7 +215,7 @@ describe('createProfile secret orchestration', () => {
   })
 
   it('stores private key and records credentialRef', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-key',
       protocol: 'ssh',
       username: 'admin',
@@ -211,13 +226,13 @@ describe('createProfile secret orchestration', () => {
   })
 
   it('creates profile without credentials when none provided', async () => {
-    const profile = await repo.createProfile({ name: 'no-creds', protocol: 'ssh', username: 'u' })
+    const profile = await profileRepo.createProfile({ name: 'no-creds', protocol: 'ssh', username: 'u' })
     expect(profile.credentialRef).toBeNull()
     expect(secretStore.size).toBe(0)
   })
 
   it('uses provided credentialRef when no password/privateKey given', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-ref',
       protocol: 'ssh',
       credentialRef: 'profile:existing-id:password'
@@ -228,27 +243,25 @@ describe('createProfile secret orchestration', () => {
 
 describe('updateProfile secret orchestration', () => {
   it('replaces credential on password change (same ref, new secret)', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-pass',
       protocol: 'ssh',
       password: 'old-pass'
     })
-    const oldRef = profile.credentialRef!
-
     // updateProfile deletes old then re-stores under the same ref pattern
-    const updated = await repo.updateProfile(profile.id, { password: 'new-pass' })
+    const updated = await profileRepo.updateProfile(profile.id, { password: 'new-pass' })
     expect(updated.credentialRef).toBeTruthy()
     expect(secretStore.get(updated.credentialRef!)).toBe('new-pass')
   })
 
   it('preserves credentialRef when no new credential provided', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-pass',
       protocol: 'ssh',
       password: 'pass'
     })
     const ref = profile.credentialRef!
-    const updated = await repo.updateProfile(profile.id, { username: 'newuser' })
+    const updated = await profileRepo.updateProfile(profile.id, { username: 'newuser' })
     expect(updated.credentialRef).toBe(ref)
     expect(updated.username).toBe('newuser')
   })
@@ -256,14 +269,14 @@ describe('updateProfile secret orchestration', () => {
 
 describe('cloneFromProfileId', () => {
   it('copies credential to new ref when cloning', async () => {
-    const source = await repo.createProfile({
+    const source = await profileRepo.createProfile({
       name: 'source',
       protocol: 'ssh',
       password: 'secret123'
     })
     secretStore.set(source.credentialRef!, 'secret123')
 
-    const cloned = await repo.createProfile({
+    const cloned = await profileRepo.createProfile({
       name: 'clone',
       protocol: 'ssh',
       cloneFromProfileId: source.id
@@ -277,7 +290,7 @@ describe('cloneFromProfileId', () => {
 
 describe('deleteProfile', () => {
   it('removes profile and cleans up credential', async () => {
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-pass',
       protocol: 'ssh',
       password: 'pass'
@@ -285,22 +298,22 @@ describe('deleteProfile', () => {
     const ref = profile.credentialRef!
     secretStore.set(ref, 'pass')
 
-    await repo.deleteProfile(profile.id)
-    expect(repo.getProfile(profile.id)).toBeNull()
+    await profileRepo.deleteProfile(profile.id)
+    expect(profileRepo.getProfile(profile.id)).toBeNull()
     expect(secretStore.has(ref)).toBe(false)
   })
 })
 
 describe('duplicateProfile', () => {
   it('creates a copy with a distinct id and credentialRef', async () => {
-    const source = await repo.createProfile({
+    const source = await profileRepo.createProfile({
       name: 'original',
       protocol: 'ssh',
       password: 'pw'
     })
     secretStore.set(source.credentialRef!, 'pw')
 
-    const dup = await repo.duplicateProfile(source.id, undefined, 'copy')
+    const dup = await profileRepo.duplicateProfile(source.id, undefined, 'copy')
     expect(dup.id).not.toBe(source.id)
     expect(dup.name).toBe('copy')
     expect(dup.credentialRef).not.toBe(source.credentialRef)
@@ -312,29 +325,29 @@ describe('duplicateProfile', () => {
 describe('host-profile links', () => {
   it('links and checks link exists', async () => {
     const host = repo.createHost({ name: 'h1', hostname: 'h1.local' })
-    const profile = await repo.createProfile({ name: 'p1', protocol: 'ssh' })
+    const profile = await profileRepo.createProfile({ name: 'p1', protocol: 'ssh' })
 
-    repo.linkHostProfile(host.id, profile.id)
-    expect(repo.isProfileLinkedToHost(host.id, profile.id)).toBe(true)
+    profileRepo.linkHostProfile(host.id, profile.id)
+    expect(profileRepo.isProfileLinkedToHost(host.id, profile.id)).toBe(true)
   })
 
   it('unlinks host-profile', async () => {
     const host = repo.createHost({ name: 'h1', hostname: 'h1.local' })
-    const profile = await repo.createProfile({ name: 'p1', protocol: 'ssh' })
+    const profile = await profileRepo.createProfile({ name: 'p1', protocol: 'ssh' })
 
-    repo.linkHostProfile(host.id, profile.id)
-    repo.unlinkHostProfile(host.id, profile.id)
-    expect(repo.isProfileLinkedToHost(host.id, profile.id)).toBe(false)
+    profileRepo.linkHostProfile(host.id, profile.id)
+    profileRepo.unlinkHostProfile(host.id, profile.id)
+    expect(profileRepo.isProfileLinkedToHost(host.id, profile.id)).toBe(false)
   })
 
   it('listProfiles returns profiles linked to a host', async () => {
     const host = repo.createHost({ name: 'h1', hostname: 'h1.local' })
-    const p1 = await repo.createProfile({ name: 'p1', protocol: 'ssh' })
-    const p2 = await repo.createProfile({ name: 'p2', protocol: 'rdp' })
-    repo.linkHostProfile(host.id, p1.id)
-    repo.linkHostProfile(host.id, p2.id)
+    const p1 = await profileRepo.createProfile({ name: 'p1', protocol: 'ssh' })
+    const p2 = await profileRepo.createProfile({ name: 'p2', protocol: 'rdp' })
+    profileRepo.linkHostProfile(host.id, p1.id)
+    profileRepo.linkHostProfile(host.id, p2.id)
 
-    const profiles = repo.listProfiles(host.id)
+    const profiles = profileRepo.listProfiles(host.id)
     expect(profiles).toHaveLength(2)
     expect(profiles.map((p) => p.id).sort()).toEqual([p1.id, p2.id].sort())
   })
@@ -342,23 +355,23 @@ describe('host-profile links', () => {
   it('listHostsForProfile returns hosts linked to a profile', async () => {
     const h1 = repo.createHost({ name: 'h1', hostname: 'h1.local' })
     const h2 = repo.createHost({ name: 'h2', hostname: 'h2.local' })
-    const p = await repo.createProfile({ name: 'p', protocol: 'ssh' })
-    repo.linkHostProfile(h1.id, p.id)
-    repo.linkHostProfile(h2.id, p.id)
+    const p = await profileRepo.createProfile({ name: 'p', protocol: 'ssh' })
+    profileRepo.linkHostProfile(h1.id, p.id)
+    profileRepo.linkHostProfile(h2.id, p.id)
 
-    const hosts = repo.listHostsForProfile(p.id)
+    const hosts = profileRepo.listHostsForProfile(p.id)
     expect(hosts).toHaveLength(2)
     expect(hosts.map((h) => h.id).sort()).toEqual([h1.id, h2.id].sort())
   })
 
   it('throws when linking non-existent host', async () => {
-    const p = await repo.createProfile({ name: 'p', protocol: 'ssh' })
-    expect(() => repo.linkHostProfile('ghost', p.id)).toThrow('Host not found: ghost')
+    const p = await profileRepo.createProfile({ name: 'p', protocol: 'ssh' })
+    expect(() => profileRepo.linkHostProfile('ghost', p.id)).toThrow('Host not found: ghost')
   })
 
   it('throws when linking non-existent profile', () => {
     const h = repo.createHost({ name: 'h', hostname: 'h.local' })
-    expect(() => repo.linkHostProfile(h.id, 'ghost')).toThrow('Profile not found: ghost')
+    expect(() => profileRepo.linkHostProfile(h.id, 'ghost')).toThrow('Profile not found: ghost')
   })
 })
 
@@ -370,13 +383,13 @@ describe('legacy profile link sync (syncLegacyProfileLinks)', () => {
     // but registers via host_profile_links table directly), then confirming
     // round-trip works.
     const host = repo.createHost({ name: 'h', hostname: 'h.local' })
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'p',
       protocol: 'ssh',
       linkHostId: host.id
     })
 
-    const links = repo.listAllProfileLinks()
+    const links = profileRepo.listAllProfileLinks()
     expect(links.some((l) => l.hostId === host.id && l.profileId === profile.id)).toBe(true)
   })
 })
@@ -391,14 +404,14 @@ describe('exportHostsBundle / importHostsBundle round-trip', () => {
       groupId: group.id,
       tags: ['web']
     })
-    const profile = await repo.createProfile({
+    const profile = await profileRepo.createProfile({
       name: 'ssh-prod',
       protocol: 'ssh',
       username: 'deploy'
     })
-    repo.linkHostProfile(host.id, profile.id)
+    profileRepo.linkHostProfile(host.id, profile.id)
 
-    const bundle = repo.exportHostsBundle()
+    const bundle = importExportService.exportHostsBundle()
     expect(bundle.hosts).toHaveLength(1)
     expect(bundle.groups).toHaveLength(1)
     expect(bundle.profiles).toHaveLength(1)
@@ -406,28 +419,30 @@ describe('exportHostsBundle / importHostsBundle round-trip', () => {
     // Reset and re-import into a fresh DB
     resetDatabaseForTest()
     setDatabaseForTest(':memory:')
-    const freshRepo = new HostRepository()
+    const freshHostRepo = new HostRepository()
+    const freshProfileRepo = new ProfileRepository()
+    const freshImportExportService = new HostImportExportService(freshHostRepo, freshProfileRepo)
 
-    const imported = await freshRepo.importHostsBundle(bundle)
+    const imported = await freshImportExportService.importHostsBundle(bundle)
     expect(imported).toHaveLength(1)
     expect(imported[0].name).toBe('web01')
     expect(imported[0].tags).toEqual(['web'])
 
     // Group should be recreated
-    const groups = freshRepo.listGroups()
+    const groups = freshHostRepo.listGroups()
     expect(groups.some((g) => g.name === 'webservers')).toBe(true)
 
     // Profile should be linked to the host
     const newGroupId = groups.find((g) => g.name === 'webservers')!.id
-    const newHost = freshRepo.listHosts({ groupId: newGroupId })[0]
-    const profiles = freshRepo.listProfiles(newHost.id)
+    const newHost = freshHostRepo.listHosts({ groupId: newGroupId })[0]
+    const profiles = freshProfileRepo.listProfiles(newHost.id)
     expect(profiles.some((p) => p.name === 'ssh-prod')).toBe(true)
   })
 
   it('handles empty bundle without error', async () => {
-    const bundle = repo.exportHostsBundle()
+    const bundle = importExportService.exportHostsBundle()
     expect(bundle.hosts).toHaveLength(0)
-    const imported = await repo.importHostsBundle(bundle)
+    const imported = await importExportService.importHostsBundle(bundle)
     expect(imported).toHaveLength(0)
   })
 })
@@ -435,7 +450,7 @@ describe('exportHostsBundle / importHostsBundle round-trip', () => {
 // ── Workspace ────────────────────────────────────────────────────────────────
 describe('workspace save / load', () => {
   it('returns a default workspace on first load', () => {
-    const ws = repo.getActiveWorkspace()
+    const ws = workspaceRepo.getActiveWorkspace()
     expect(ws.id).toBeTruthy()
     expect(ws.isLastActive).toBe(true)
   })
@@ -453,18 +468,18 @@ describe('workspace save / load', () => {
         }
       ]
     }
-    repo.saveWorkspace(state)
-    const loaded = repo.loadWorkspace()
+    workspaceRepo.saveWorkspace(state)
+    const loaded = workspaceRepo.loadWorkspace()
     expect(loaded.panes).toHaveLength(1)
     expect(loaded.panes[0].paneId).toBe('pane-1')
     expect(loaded.panes[0].connectRequest.hostId).toBe('h1')
   })
 
   it('loadWorkspace returns empty state when layout is null/corrupt', () => {
-    const ws = repo.getActiveWorkspace()
+    const ws = workspaceRepo.getActiveWorkspace()
     // Default workspace has layout_json = 'null'
     expect(ws.layoutJson).toBe('null')
-    const loaded = repo.loadWorkspace()
+    const loaded = workspaceRepo.loadWorkspace()
     expect(loaded.layout).toBeNull()
     expect(loaded.panes).toEqual([])
   })
@@ -474,7 +489,7 @@ describe('workspace save / load', () => {
 describe('saveSessionSnapshot / getSessionSnapshot', () => {
   it('saves and retrieves a session snapshot', () => {
     // Use null for FK fields since no real host/profile rows exist
-    repo.saveSessionSnapshot({
+    workspaceRepo.saveSessionSnapshot({
       id: 'snap-1',
       hostId: null,
       profileId: null,
@@ -485,7 +500,7 @@ describe('saveSessionSnapshot / getSessionSnapshot', () => {
       rows: 40,
       scrollbackSerialized: null
     })
-    const snap = repo.getSessionSnapshot('snap-1')
+    const snap = workspaceRepo.getSessionSnapshot('snap-1')
     expect(snap).toBeTruthy()
     expect(snap!.protocol).toBe('ssh')
     expect(snap!.cwd).toBe('/home/user')
@@ -494,7 +509,7 @@ describe('saveSessionSnapshot / getSessionSnapshot', () => {
   })
 
   it('returns null for unknown snapshot id', () => {
-    expect(repo.getSessionSnapshot('ghost')).toBeNull()
+    expect(workspaceRepo.getSessionSnapshot('ghost')).toBeNull()
   })
 
   it('overwrites existing snapshot on re-save', () => {
@@ -509,16 +524,16 @@ describe('saveSessionSnapshot / getSessionSnapshot', () => {
       rows: 24,
       scrollbackSerialized: null
     } as const
-    repo.saveSessionSnapshot(base)
-    repo.saveSessionSnapshot({ ...base, cols: 200 })
-    expect(repo.getSessionSnapshot('snap-1')!.cols).toBe(200)
+    workspaceRepo.saveSessionSnapshot(base)
+    workspaceRepo.saveSessionSnapshot({ ...base, cols: 200 })
+    expect(workspaceRepo.getSessionSnapshot('snap-1')!.cols).toBe(200)
   })
 })
 
 // ── migratePaneBinding ───────────────────────────────────────────────────────
 describe('migratePaneBinding (via loadWorkspace)', () => {
   it('falls back to an empty connectRequest for panes without one', () => {
-    const ws = repo.getActiveWorkspace()
+    const ws = workspaceRepo.getActiveWorkspace()
     getDatabase()
       .prepare('UPDATE workspaces SET layout_json = ? WHERE id = ?')
       .run(
@@ -529,7 +544,7 @@ describe('migratePaneBinding (via loadWorkspace)', () => {
         ws.id
       )
 
-    const loaded = repo.loadWorkspace()
+    const loaded = workspaceRepo.loadWorkspace()
     // migratePaneBinding should have populated connectRequest (even if empty)
     expect(loaded.panes[0].connectRequest).toBeDefined()
     expect(loaded.panes[0].paneId).toBe('pane-legacy')
@@ -538,9 +553,9 @@ describe('migratePaneBinding (via loadWorkspace)', () => {
   it('uses snapshot data when pane has a sessionId and no connectRequest', async () => {
     // Create real host/profile to satisfy FK constraints
     const host = repo.createHost({ name: 'web01', hostname: '10.0.0.1' })
-    const profile = await repo.createProfile({ name: 'ssh-prod', protocol: 'ssh' })
+    const profile = await profileRepo.createProfile({ name: 'ssh-prod', protocol: 'ssh' })
 
-    repo.saveSessionSnapshot({
+    workspaceRepo.saveSessionSnapshot({
       id: 'snap-abc',
       hostId: host.id,
       profileId: profile.id,
@@ -552,7 +567,7 @@ describe('migratePaneBinding (via loadWorkspace)', () => {
       scrollbackSerialized: null
     })
 
-    const ws = repo.getActiveWorkspace()
+    const ws = workspaceRepo.getActiveWorkspace()
     getDatabase()
       .prepare('UPDATE workspaces SET layout_json = ? WHERE id = ?')
       .run(
@@ -563,7 +578,7 @@ describe('migratePaneBinding (via loadWorkspace)', () => {
         ws.id
       )
 
-    const loaded = repo.loadWorkspace()
+    const loaded = workspaceRepo.loadWorkspace()
     const pane = loaded.panes[0]
     expect(pane.connectRequest.hostId).toBe(host.id)
     expect(pane.connectRequest.profileId).toBe(profile.id)

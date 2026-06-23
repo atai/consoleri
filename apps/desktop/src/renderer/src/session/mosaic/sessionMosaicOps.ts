@@ -3,21 +3,8 @@ import type { MosaicNode } from 'react-mosaic-component'
 import { insertPaneIntoLayout, splitPaneInLayout } from '@consoleri/core'
 import type { MosaicNode as CoreMosaicNode } from '@consoleri/core'
 import type { OpenSessionRequest, PaneBinding, SessionInfo } from '@shared/types'
-
-const SETTINGS_KEY = 'consoleri.settings'
-
-function loadAutoOpenConnectionLog(): boolean {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as { autoOpenConnectionLog?: boolean }
-      return parsed.autoOpenConnectionLog ?? false
-    }
-  } catch {
-    /* ignore */
-  }
-  return false
-}
+import { usePreferencesStore } from '../../stores/preferencesStore'
+import { getConsoleriApi } from '../../api'
 
 export function createPaneBinding(
   session: SessionInfo,
@@ -35,18 +22,21 @@ export function createPaneBinding(
 export async function openMosaicSession(
   request: OpenSessionRequest
 ): Promise<SessionInfo | null> {
-  const session = await window.consoleri.sessions.open(request)
+  const api = getConsoleriApi()
+  const session = await api.sessions.open(request)
+
+  const autoOpenConnectionLog = usePreferencesStore.getState().settings.autoOpenConnectionLog
 
   if (session.status === 'error') {
     alert(session.error ?? 'Connection failed')
-    if (loadAutoOpenConnectionLog()) {
-      void window.consoleri.sessions.openLogWindow(session.id)
+    if (autoOpenConnectionLog) {
+      void api.sessions.openLogWindow(session.id)
     }
     return null
   }
 
-  if (loadAutoOpenConnectionLog() && session.status === 'connecting') {
-    void window.consoleri.sessions.openLogWindow(session.id)
+  if (autoOpenConnectionLog && session.status === 'connecting') {
+    void api.sessions.openLogWindow(session.id)
   }
 
   return session
@@ -100,7 +90,7 @@ export async function reconnectMosaicPane(
   if (!binding) return null
 
   const session = binding.sessionId
-    ? await window.consoleri.sessions.reconnect(binding.sessionId)
+    ? await getConsoleriApi().sessions.reconnect(binding.sessionId)
     : await openMosaicSession({ ...binding.connectRequest })
 
   if (!session) return null

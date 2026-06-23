@@ -1,14 +1,14 @@
 import { useCallback, useEffect } from 'react'
 import type { MosaicNode } from 'react-mosaic-component'
 import type { SessionInfo } from '@shared/types'
-import { useAppStore, flushWorkspacePersist } from '../../stores/appStore'
+import { flushWorkspacePersist, useSessionWorkspaceStore } from '../../stores/sessionWorkspaceStore'
 import { SessionMosaic, closeMosaicPane } from '../../session/mosaic/SessionMosaic'
 import { reconnectMosaicPane, splitMosaicPane } from '../../session/mosaic/sessionMosaicOps'
 import { serializeAll } from '../../terminal/TerminalPool'
 
 export function MosaicWorkspace(): React.JSX.Element {
   const { workspace, sessions, persistWorkspace, addSession, updateSession, removeSession } =
-    useAppStore()
+    useSessionWorkspaceStore()
 
   const layout = workspace.layout as MosaicNode<string> | null
 
