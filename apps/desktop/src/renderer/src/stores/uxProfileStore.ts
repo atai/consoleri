@@ -5,8 +5,6 @@ import { applyAppearanceToAll } from '../terminal/TerminalPool'
 import { useAppStore } from './appStore'
 import { useSessionWorkspaceStore } from './sessionWorkspaceStore'
 
-const LEGACY_SIDEBAR_WIDTH_KEY = 'consoleri.sidebarWidth'
-
 interface UxProfileState {
   profiles: UxProfile[]
   activeId: string | null
@@ -30,19 +28,6 @@ export const useUxProfileStore = create<UxProfileState>((set, get) => ({
   activeId: null,
   loaded: false,
   refresh: async () => {
-    try {
-      const legacyRaw = localStorage.getItem(LEGACY_SIDEBAR_WIDTH_KEY)
-      if (legacyRaw) {
-        const legacyWidth = Number(legacyRaw)
-        if (Number.isFinite(legacyWidth)) {
-          await window.consoleri.uxProfiles.migrateSidebarWidth(legacyWidth)
-        }
-        localStorage.removeItem(LEGACY_SIDEBAR_WIDTH_KEY)
-      }
-    } catch {
-      /* ignore legacy migration errors */
-    }
-
     const [profiles, active] = await Promise.all([
       window.consoleri.uxProfiles.list(),
       window.consoleri.uxProfiles.getActive()

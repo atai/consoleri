@@ -19,7 +19,6 @@ const {
   mockRegisterLogContext,
   mockSshKeyService,
   mockSshKeyDeployer,
-  mockMigrateSidebar,
   mockAppPrefs,
   mockReportRepo,
   mockReportRunner
@@ -96,12 +95,13 @@ const {
     listAssignableHosts: vi.fn()
   },
   mockSshKeyDeployer: { deploy: vi.fn(() => Promise.resolve({ success: true, message: 'ok' })) },
-  mockMigrateSidebar: vi.fn(),
   mockAppPrefs: {
     getHostListView: vi.fn(),
     setHostListView: vi.fn(),
     getMapView: vi.fn(),
-    setMapView: vi.fn()
+    setMapView: vi.fn(),
+    getAppSettings: vi.fn().mockReturnValue({ autoOpenConnectionLog: false, sessionOpenMode: 'workspace' }),
+    setAppSettings: vi.fn().mockReturnValue({ autoOpenConnectionLog: false, sessionOpenMode: 'workspace' })
   },
   mockReportRepo: {
     list: vi.fn(),
@@ -153,7 +153,6 @@ vi.mock('../windows/ReportWindow', () => ({ openReportWindow: vi.fn() }))
 vi.mock('../windows/SessionWindow', () => ({ openSessionWindow: vi.fn() }))
 vi.mock('../keys/SshKeyService', () => ({ sshKeyService: mockSshKeyService }))
 vi.mock('../keys/SshKeyDeployer', () => ({ sshKeyDeployer: mockSshKeyDeployer }))
-vi.mock('../db/database', () => ({ migrateSidebarWidthFromRenderer: mockMigrateSidebar }))
 vi.mock('../preferences/AppPreferencesRepository', () => ({
   appPreferencesRepository: mockAppPrefs
 }))
@@ -235,7 +234,6 @@ describe('IPC channel inventory', () => {
     IPC_CHANNELS.uxProfilesGetActive,
     IPC_CHANNELS.uxProfilesSetActive,
     IPC_CHANNELS.uxProfilesListHosts,
-    IPC_CHANNELS.uxProfilesMigrateSidebarWidth,
     IPC_CHANNELS.uxProfilesLinkHost,
     IPC_CHANNELS.uxProfilesUnlinkHost,
     IPC_CHANNELS.clipboardReadText,
@@ -244,6 +242,8 @@ describe('IPC channel inventory', () => {
     IPC_CHANNELS.preferencesSetHostListView,
     IPC_CHANNELS.preferencesGetMapView,
     IPC_CHANNELS.preferencesSetMapView,
+    IPC_CHANNELS.preferencesGetAppSettings,
+    IPC_CHANNELS.preferencesSetAppSettings,
     IPC_CHANNELS.reportsList,
     IPC_CHANNELS.reportsGet,
     IPC_CHANNELS.reportsCreate,
@@ -567,11 +567,6 @@ describe('uxProfiles routing', () => {
   it('uxProfiles:set-active → uxProfileRepository.setActive', async () => {
     await handleMap.get(IPC_CHANNELS.uxProfilesSetActive)!(FAKE_EVENT, 'profile-id')
     expect(mockUxProfileRepo.setActive).toHaveBeenCalledWith('profile-id')
-  })
-
-  it('uxProfiles:migrate-sidebar-width → migrateSidebarWidthFromRenderer', async () => {
-    await handleMap.get(IPC_CHANNELS.uxProfilesMigrateSidebarWidth)!(FAKE_EVENT, 240)
-    expect(mockMigrateSidebar).toHaveBeenCalledWith(240)
   })
 
   it('uxProfiles:link-host → uxProfileRepository.linkHost', async () => {

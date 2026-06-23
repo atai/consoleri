@@ -21,12 +21,14 @@ export function AppShell({ workspaceReady }: AppShellProps): React.JSX.Element {
   const { addSession, updateSession, removeSession } = useSessionWorkspaceStore()
   const { settings } = usePreferencesStore()
   const refreshUxProfiles = useUxProfileStore((s) => s.refresh)
+  const refreshPreferences = usePreferencesStore((s) => s.refresh)
   const [bootstrapped, setBootstrapped] = useState(false)
 
   useEffect(() => {
     void loadMapView().then(() => setBootstrapped(true))
     void refreshUxProfiles()
-  }, [loadMapView, refreshUxProfiles])
+    void refreshPreferences()
+  }, [loadMapView, refreshUxProfiles, refreshPreferences])
 
   useEffect(() => {
     if (!mapViewLoaded) return

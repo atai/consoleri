@@ -5,6 +5,10 @@ const mockPreferencesSetHostListView = vi.fn().mockResolvedValue(undefined)
 const mockPreferencesSetMapView = vi.fn().mockResolvedValue(undefined)
 const mockPreferencesGetHostListView = vi.fn()
 const mockPreferencesGetMapView = vi.fn()
+const mockPreferencesGetAppSettings = vi.fn().mockResolvedValue({ autoOpenConnectionLog: false, sessionOpenMode: 'workspace' })
+const mockPreferencesSetAppSettings = vi.fn().mockImplementation((patch: Record<string, unknown>) =>
+  Promise.resolve({ autoOpenConnectionLog: false, sessionOpenMode: 'workspace', ...patch })
+)
 const mockWorkspaceSave = vi.fn().mockResolvedValue(undefined)
 const mockHostsList = vi.fn().mockResolvedValue([])
 const mockGroupsList = vi.fn().mockResolvedValue([])
@@ -18,7 +22,9 @@ function installConsoleriGlobal() {
         setHostListView: mockPreferencesSetHostListView,
         setMapView: mockPreferencesSetMapView,
         getHostListView: mockPreferencesGetHostListView,
-        getMapView: mockPreferencesGetMapView
+        getMapView: mockPreferencesGetMapView,
+        getAppSettings: mockPreferencesGetAppSettings,
+        setAppSettings: mockPreferencesSetAppSettings
       },
       workspace: {
         save: mockWorkspaceSave
@@ -218,39 +224,43 @@ describe('flushWorkspacePersist', () => {
   })
 })
 
-// ── settings: load / persist ──────────────────────────────────────────────────
+// ── settings: load / persist via IPC ─────────────────────────────────────────
 describe('settings load/persist', () => {
-  it('loads defaults when localStorage is empty', async () => {
+  it('has default settings before refresh', async () => {
     const { usePreferencesStore } = await freshPreferencesStore()
     const { settings } = usePreferencesStore.getState()
     expect(settings.autoOpenConnectionLog).toBe(false)
     expect(settings.sessionOpenMode).toBe('workspace')
   })
 
-  it('persists settings to localStorage when changed', async () => {
+  it('refresh loads settings from IPC', async () => {
+    mockPreferencesGetAppSettings.mockResolvedValueOnce({ autoOpenConnectionLog: true, sessionOpenMode: 'window' })
     const { usePreferencesStore } = await freshPreferencesStore()
-    usePreferencesStore.getState().setAutoOpenConnectionLog(true)
-    expect(mockLocalStorage.setItem).toHaveBeenCalled()
-    const raw = mockLocalStorage.setItem.mock.calls.at(-1)?.[1] as string
-    expect(JSON.parse(raw).autoOpenConnectionLog).toBe(true)
+    await usePreferencesStore.getState().refresh()
+    expect(usePreferencesStore.getState().settings.autoOpenConnectionLog).toBe(true)
+    expect(usePreferencesStore.getState().settings.sessionOpenMode).toBe('window')
   })
 
-  it('reads persisted autoOpenConnectionLog from localStorage on load', async () => {
+  it('setAutoOpenConnectionLog calls setAppSettings IPC', async () => {
+    const { usePreferencesStore } = await freshPreferencesStore()
+    await usePreferencesStore.getState().setAutoOpenConnectionLog(true)
+    expect(mockPreferencesSetAppSettings).toHaveBeenCalledWith({ autoOpenConnectionLog: true })
+  })
+
+  it('setSessionOpenMode calls setAppSettings IPC', async () => {
+    const { usePreferencesStore } = await freshPreferencesStore()
+    await usePreferencesStore.getState().setSessionOpenMode('window')
+    expect(mockPreferencesSetAppSettings).toHaveBeenCalledWith({ sessionOpenMode: 'window' })
+  })
+
+  it('refresh migrates legacy localStorage key and removes it', async () => {
     storage.set('consoleri.settings', JSON.stringify({ autoOpenConnectionLog: true, sessionOpenMode: 'workspace' }))
     const { usePreferencesStore } = await freshPreferencesStore()
-    expect(usePreferencesStore.getState().settings.autoOpenConnectionLog).toBe(true)
-  })
-
-  it('normalizes unknown sessionOpenMode to workspace', async () => {
-    storage.set('consoleri.settings', JSON.stringify({ sessionOpenMode: 'invalid' }))
-    const { usePreferencesStore } = await freshPreferencesStore()
-    expect(usePreferencesStore.getState().settings.sessionOpenMode).toBe('workspace')
-  })
-
-  it('accepts window sessionOpenMode value', async () => {
-    storage.set('consoleri.settings', JSON.stringify({ sessionOpenMode: 'window' }))
-    const { usePreferencesStore } = await freshPreferencesStore()
-    expect(usePreferencesStore.getState().settings.sessionOpenMode).toBe('window')
+    await usePreferencesStore.getState().refresh()
+    expect(mockPreferencesSetAppSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ autoOpenConnectionLog: true })
+    )
+    expect(storage.has('consoleri.settings')).toBe(false)
   })
 })
 

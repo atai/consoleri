@@ -5,10 +5,7 @@ import { join } from 'path'
 import { nanoid } from 'nanoid'
 import {
   BUILTIN_UX_PROFILE_ID,
-  createBuiltinUxProfile,
-  DEFAULT_CHROME_APPEARANCE,
-  MAX_SIDEBAR_WIDTH,
-  MIN_SIDEBAR_WIDTH
+  createBuiltinUxProfile
 } from '@consoleri/core'
 
 let db: DatabaseSync | null = null
@@ -263,24 +260,3 @@ function migrateReports(database: DatabaseSync): void {
   `)
 }
 
-export function migrateSidebarWidthFromRenderer(width: number): void {
-  const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
-  if (clamped === DEFAULT_CHROME_APPEARANCE.sidebarWidth) return
-  const db = getDatabase()
-  const row = db.prepare('SELECT settings_json FROM ux_profiles WHERE id = ?').get(BUILTIN_UX_PROFILE_ID) as
-    | { settings_json: string }
-    | undefined
-  if (!row) return
-  const settings = JSON.parse(row.settings_json) as {
-    terminal?: unknown
-    chrome?: { sidebarWidth?: number }
-  }
-  if (settings.chrome?.sidebarWidth === clamped) return
-  settings.chrome = { ...DEFAULT_CHROME_APPEARANCE, ...settings.chrome, sidebarWidth: clamped }
-  const now = new Date().toISOString()
-  db.prepare(`UPDATE ux_profiles SET settings_json = ?, updated_at = ? WHERE id = ?`).run(
-    JSON.stringify(settings),
-    now,
-    BUILTIN_UX_PROFILE_ID
-  )
-}

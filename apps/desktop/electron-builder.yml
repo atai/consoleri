@@ -10,6 +10,9 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
 asarUnpack:
   - resources/**
   - '**/node_modules/node-pty/**/*'
@@ -19,6 +22,11 @@ asarUnpack:
 win:
   executableName: Consoleri
 nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  selectPerMachineByDefault: false
+  allowToChangeInstallationDirectory: true
   artifactName: ${productName}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}

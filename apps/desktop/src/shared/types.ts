@@ -1,6 +1,13 @@
 export type OsType = 'windows' | 'linux' | 'macos' | 'unknown'
 export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
+
+export type SessionOpenMode = 'workspace' | 'window'
+
+export interface AppSettings {
+  autoOpenConnectionLog: boolean
+  sessionOpenMode: SessionOpenMode
+}
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, CustomTestConfig, CustomTestEntry, CustomTestCommand, CustomTestResult, CustomTestHostResult, CustomTestCommandResult, ReportProgressEvent, VaultSettings, VaultSettingsUpdate, VaultStatus, VaultAuthMethod, SecretBackendKind } from '@consoleri/core'
@@ -261,11 +268,12 @@ export const IPC_CHANNELS = {
   uxProfilesListHosts: 'uxProfiles:list-hosts',
   uxProfilesLinkHost: 'uxProfiles:link-host',
   uxProfilesUnlinkHost: 'uxProfiles:unlink-host',
-  uxProfilesMigrateSidebarWidth: 'uxProfiles:migrate-sidebar-width',
   preferencesGetHostListView: 'preferences:get-host-list-view',
   preferencesSetHostListView: 'preferences:set-host-list-view',
   preferencesGetMapView: 'preferences:get-map-view',
   preferencesSetMapView: 'preferences:set-map-view',
+  preferencesGetAppSettings: 'preferences:get-app-settings',
+  preferencesSetAppSettings: 'preferences:set-app-settings',
   reportsList: 'reports:list',
   reportsGet: 'reports:get',
   reportsCreate: 'reports:create',

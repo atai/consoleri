@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC_CHANNELS } from '../shared/types'
 import type {
+  AppSettings,
   Host,
   HostFilter,
   HostGroup,
@@ -128,7 +129,6 @@ export interface ConsoleriAPI {
     listHosts: (profileId: string) => Promise<Host[]>
     linkHost: (hostId: string, profileId: string) => Promise<void>
     unlinkHost: (hostId: string) => Promise<void>
-    migrateSidebarWidth: (width: number) => Promise<void>
   }
   clipboard: {
     readText: () => Promise<string>
@@ -139,6 +139,8 @@ export interface ConsoleriAPI {
     setHostListView: (patch: Partial<HostListViewSettings>) => Promise<HostListViewSettings>
     getMapView: () => Promise<MapViewSettings>
     setMapView: (patch: Partial<MapViewSettings>) => Promise<MapViewSettings>
+    getAppSettings: () => Promise<AppSettings>
+    setAppSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>
   }
   reports: {
     list: () => Promise<Report[]>
@@ -268,9 +270,7 @@ const consoleri: ConsoleriAPI = {
     listHosts: (profileId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesListHosts, profileId),
     linkHost: (hostId, profileId) =>
       ipcRenderer.invoke(IPC_CHANNELS.uxProfilesLinkHost, hostId, profileId),
-    unlinkHost: (hostId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesUnlinkHost, hostId),
-    migrateSidebarWidth: (width) =>
-      ipcRenderer.invoke(IPC_CHANNELS.uxProfilesMigrateSidebarWidth, width)
+    unlinkHost: (hostId) => ipcRenderer.invoke(IPC_CHANNELS.uxProfilesUnlinkHost, hostId)
   },
   clipboard: {
     readText: () => ipcRenderer.invoke(IPC_CHANNELS.clipboardReadText),
@@ -280,7 +280,9 @@ const consoleri: ConsoleriAPI = {
     getHostListView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetHostListView),
     setHostListView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetHostListView, patch),
     getMapView: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetMapView),
-    setMapView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetMapView, patch)
+    setMapView: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetMapView, patch),
+    getAppSettings: () => ipcRenderer.invoke(IPC_CHANNELS.preferencesGetAppSettings),
+    setAppSettings: (patch) => ipcRenderer.invoke(IPC_CHANNELS.preferencesSetAppSettings, patch)
   },
   reports: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.reportsList),

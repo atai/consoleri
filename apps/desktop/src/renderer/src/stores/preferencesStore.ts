@@ -1,54 +1,52 @@
 import { create } from 'zustand'
+import type { AppSettings, SessionOpenMode } from '@shared/types'
 
-export type SessionOpenMode = 'workspace' | 'window'
+export type { SessionOpenMode }
 
-interface AppSettings {
-  autoOpenConnectionLog: boolean
-  sessionOpenMode: SessionOpenMode
-}
+const LEGACY_SETTINGS_KEY = 'consoleri.settings'
 
-const SETTINGS_KEY = 'consoleri.settings'
-
-function normalizeSessionOpenMode(value: unknown): SessionOpenMode {
-  return value === 'window' ? 'window' : 'workspace'
-}
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppSettings>
-      return {
-        autoOpenConnectionLog: parsed.autoOpenConnectionLog ?? false,
-        sessionOpenMode: normalizeSessionOpenMode(parsed.sessionOpenMode)
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return { autoOpenConnectionLog: false, sessionOpenMode: 'workspace' }
-}
-
-function persistSettings(settings: AppSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+const DEFAULT_SETTINGS: AppSettings = {
+  autoOpenConnectionLog: false,
+  sessionOpenMode: 'workspace'
 }
 
 interface PreferencesState {
   settings: AppSettings
-  setAutoOpenConnectionLog: (value: boolean) => void
-  setSessionOpenMode: (mode: SessionOpenMode) => void
+  loaded: boolean
+  refresh: () => Promise<void>
+  setAutoOpenConnectionLog: (value: boolean) => Promise<void>
+  setSessionOpenMode: (mode: SessionOpenMode) => Promise<void>
 }
 
-export const usePreferencesStore = create<PreferencesState>((set, get) => ({
-  settings: loadSettings(),
-  setAutoOpenConnectionLog: (autoOpenConnectionLog) => {
-    const settings = { ...get().settings, autoOpenConnectionLog }
-    persistSettings(settings)
+export const usePreferencesStore = create<PreferencesState>((set) => ({
+  settings: { ...DEFAULT_SETTINGS },
+  loaded: false,
+
+  refresh: async () => {
+    // One-time migration: if the old localStorage key exists, push its values
+    // to the DB and remove the key so this branch never runs again.
+    try {
+      const legacy = localStorage.getItem(LEGACY_SETTINGS_KEY)
+      if (legacy) {
+        const parsed = JSON.parse(legacy) as Partial<AppSettings>
+        await window.consoleri.preferences.setAppSettings(parsed)
+        localStorage.removeItem(LEGACY_SETTINGS_KEY)
+      }
+    } catch {
+      /* ignore migration errors */
+    }
+
+    const settings = await window.consoleri.preferences.getAppSettings()
+    set({ settings, loaded: true })
+  },
+
+  setAutoOpenConnectionLog: async (autoOpenConnectionLog) => {
+    const settings = await window.consoleri.preferences.setAppSettings({ autoOpenConnectionLog })
     set({ settings })
   },
-  setSessionOpenMode: (sessionOpenMode) => {
-    const settings = { ...get().settings, sessionOpenMode }
-    persistSettings(settings)
+
+  setSessionOpenMode: async (sessionOpenMode) => {
+    const settings = await window.consoleri.preferences.setAppSettings({ sessionOpenMode })
     set({ settings })
   }
 }))

@@ -1,10 +1,16 @@
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { getDataDir } from './paths'
 import { APP_NAME, appIconPath } from './appBranding'
 import { getDatabase, closeDatabase } from './db/database'
 import { registerIpcHandlers } from './ipc/register'
 import { sessionManager } from './compositionRoot'
+
+// Must be called before app.whenReady() and before any call to app.getPath('userData').
+// This redirects ALL Electron storage (SQLite, localStorage, IndexedDB, cookies)
+// to our custom data directory so dev and packaged builds never share state.
+app.setPath('userData', getDataDir())
 
 let mainWindow: BrowserWindow | null = null
 

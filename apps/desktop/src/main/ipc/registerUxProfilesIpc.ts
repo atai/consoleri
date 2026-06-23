@@ -5,8 +5,6 @@ import type { UxProfileInput } from '../../shared/types'
 import { Id, UxProfileInputSchema } from '../../shared/ipcSchemas'
 import { createHandler } from './createHandler'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
-import { migrateSidebarWidthFromRenderer } from '../db/database'
-
 export function registerUxProfilesIpc(): void {
   ipcMain.handle(IPC_CHANNELS.uxProfilesList, (_e, hostId?: string) => {
     return uxProfileRepository.list(hostId)
@@ -57,13 +55,6 @@ export function registerUxProfilesIpc(): void {
     createHandler(Id, (profileId: string) =>
       Promise.resolve(uxProfileRepository.listHosts(profileId))
     )
-  )
-
-  ipcMain.handle(IPC_CHANNELS.uxProfilesMigrateSidebarWidth,
-    createHandler(z.number().int().positive(), (width: number) => {
-      migrateSidebarWidthFromRenderer(width)
-      return Promise.resolve()
-    })
   )
 
   ipcMain.handle(IPC_CHANNELS.uxProfilesLinkHost,

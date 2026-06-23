@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/types'
 import { createHandler } from './createHandler'
 import { appPreferencesRepository } from '../preferences/AppPreferencesRepository'
-import type { HostListViewSettings, MapViewSettings } from '@consoleri/core'
+import type { AppSettings, HostListViewSettings, MapViewSettings } from '../../shared/types'
 
 export function registerPreferencesIpc(): void {
   // ── clipboard ──────────────────────────────────────────────────────────────
@@ -37,4 +37,16 @@ export function registerPreferencesIpc(): void {
   ipcMain.handle(IPC_CHANNELS.preferencesSetMapView, (_e, patch: Partial<MapViewSettings>) => {
     return appPreferencesRepository.setMapView(patch)
   })
+
+  ipcMain.handle(IPC_CHANNELS.preferencesGetAppSettings, () => {
+    return appPreferencesRepository.getAppSettings()
+  })
+
+  ipcMain.handle(
+    IPC_CHANNELS.preferencesSetAppSettings,
+    createHandler(
+      z.object({ autoOpenConnectionLog: z.boolean().optional(), sessionOpenMode: z.enum(['workspace', 'window']).optional() }),
+      (patch) => Promise.resolve(appPreferencesRepository.setAppSettings(patch as Partial<AppSettings>))
+    )
+  )
 }
