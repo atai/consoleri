@@ -246,13 +246,13 @@ export function useRdpConnection({
   }
 }
 
-interface IronRdpInputApi {
+export interface IronRdpInputApi {
   DeviceEvent: typeof import('ironrdp-wasm').DeviceEvent
   InputTransaction: typeof import('ironrdp-wasm').InputTransaction
   RotationUnit: typeof import('ironrdp-wasm').RotationUnit
 }
 
-function attachInputHandlers(
+export function attachInputHandlers(
   canvas: HTMLCanvasElement,
   getSession: () => IronRdpSession | null,
   api: IronRdpInputApi

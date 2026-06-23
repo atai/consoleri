@@ -13,6 +13,23 @@ import {
 
 let db: DatabaseSync | null = null
 
+// Exposed only for tests — production code never calls these.
+export function setDatabaseForTest(dbOrPath: ':memory:' | string = ':memory:'): void {
+  if (db) {
+    db.close()
+    db = null
+  }
+  db = new DatabaseSync(dbOrPath)
+  initializeDatabase(db)
+}
+
+export function resetDatabaseForTest(): void {
+  if (db) {
+    db.close()
+    db = null
+  }
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS host_groups (
   id TEXT PRIMARY KEY,
@@ -109,6 +126,27 @@ CREATE TABLE IF NOT EXISTS custom_ssh_keys (
 );
 `
 
+function initializeDatabase(database: DatabaseSync): void {
+  database.exec('PRAGMA journal_mode = WAL')
+  database.exec('PRAGMA foreign_keys = ON')
+  database.exec(SCHEMA)
+  migrateHostProfileLinks(database)
+  migrateHostLogVerbosity(database)
+  migrateUxProfiles(database)
+  migrateHostRelations(database)
+  migrateHostHttpEndpoint(database)
+  migrateReports(database)
+
+  const workspaceCount = database.prepare('SELECT COUNT(*) as c FROM workspaces').get() as {
+    c: number
+  }
+  if (workspaceCount.c === 0) {
+    database
+      .prepare(`INSERT INTO workspaces (id, name, layout_json, is_last_active) VALUES (?, ?, ?, 1)`)
+      .run(nanoid(), 'Default', 'null')
+  }
+}
+
 export function getDatabase(): DatabaseSync {
   if (db) return db
 
@@ -119,22 +157,7 @@ export function getDatabase(): DatabaseSync {
 
   const dbPath = join(userData, 'consoleri.db')
   db = new DatabaseSync(dbPath)
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA foreign_keys = ON')
-  db.exec(SCHEMA)
-  migrateHostProfileLinks(db)
-  migrateHostLogVerbosity(db)
-  migrateUxProfiles(db)
-  migrateHostRelations(db)
-  migrateHostHttpEndpoint(db)
-  migrateReports(db)
-
-  const workspaceCount = db.prepare('SELECT COUNT(*) as c FROM workspaces').get() as { c: number }
-  if (workspaceCount.c === 0) {
-    db.prepare(
-      `INSERT INTO workspaces (id, name, layout_json, is_last_active) VALUES (?, ?, ?, 1)`
-    ).run(nanoid(), 'Default', 'null')
-  }
+  initializeDatabase(db)
 
   return db
 }
