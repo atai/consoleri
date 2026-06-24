@@ -17,6 +17,8 @@ asarUnpack:
   - '**/node_modules/ironrdp-wasm/**/*'
 win:
   executableName: Consoleri
+  icon: icon.ico
+  signAndEditExecutable: true
 nsis:
   oneClick: false
   perMachine: false

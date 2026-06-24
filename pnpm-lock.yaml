@@ -156,6 +156,9 @@ importers:
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0
+      png2icons:
+        specifier: ^2.0.1
+        version: 2.0.1
       prettier:
         specifier: ^3.7.4
         version: 3.8.4
@@ -3066,6 +3069,10 @@ packages:
   plist@3.1.0:
     resolution: {integrity: sha512-uysumyrvkUX0rX/dEVqt8gC3sTBzd4zoWfLeS29nb53imdaXVvLINYXTI2GNqzaMuvacNx4uJQ8+b3zXR0pkgQ==}
     engines: {node: '>=10.4.0'}
+
+  png2icons@2.0.1:
+    resolution: {integrity: sha512-GDEQJr8OG4e6JMp7mABtXFSEpgJa1CCpbQiAR+EjhkHJHnUL9zPPtbOrjsMD8gUbikgv3j7x404b0YJsV3aVFA==}
+    hasBin: true
 
   pnpm@10.12.1:
     resolution: {integrity: sha512-8N2oWA8O6UgcXHmh2Se5Fk8sR46QmSrSaLuyRlpzaYQ5HWMz0sMnkTV4soBK8zR0ylVLopwEqLEwYKcXZ1rjrA==}
@@ -7132,6 +7139,8 @@ snapshots:
       '@xmldom/xmldom': 0.8.13
       base64-js: 1.5.1
       xmlbuilder: 15.1.1
+
+  png2icons@2.0.1: {}
 
   pnpm@10.12.1: {}
 

@@ -1,5 +1,5 @@
 import type { BrowserWindow } from 'electron'
-import { APP_NAME } from './appBranding'
+import { APP_NAME } from './appName'
 import { hostRepository } from './hosts/HostRepository'
 import { profileRepository } from './hosts/ProfileRepository'
 import type { SessionInfo } from '../shared/types'

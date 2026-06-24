@@ -1,6 +1,6 @@
 {
   "name": "@consoleri/desktop",
-  "version": "0.4.1",
+  "version": "0.4.3",
   "description": "Consoleri desktop — SSH, shell, RDP, VNC host manager",
   "main": "./out/main/index.js",
   "author": "consoleri",
@@ -13,6 +13,7 @@
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "start": "electron-vite preview",
     "build:app": "electron-vite build",
+    "icons:build": "png2icons build/icon.png build/icon -allwe -bc",
     "dev:watch": "cross-env CONSOLERI_DATA_DIR=.consoleri-dev electron-vite dev",
     "dev": "pnpm run build:app && pnpm run dev:watch",
     "build": "pnpm run typecheck && pnpm run build:app",
@@ -76,6 +77,7 @@
     "jsdom": "^26.1.0",
     "cross-env": "^7.0.3",
     "prettier": "^3.7.4",
+    "png2icons": "^2.0.1",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
     "vite": "^7.2.6",
