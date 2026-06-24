@@ -10,6 +10,12 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!dist/**'
+  - '!dist_*/**'
+  - '!coverage/**'
+  - '!.consoleri-dev/**'
+  - '!vitest*.config.ts'
+  - '!**/*.map'
 asarUnpack:
   - '**/node_modules/node-pty/**/*'
   - '**/node_modules/ssh2/**/*'

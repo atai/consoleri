@@ -1,5 +1,7 @@
 node_modules
 dist
+dist_new
+coverage
 out
 .DS_Store
 .eslintcache
