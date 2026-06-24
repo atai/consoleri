@@ -19,7 +19,7 @@ const BACKUP_SETTINGS_KEY = 'backup_settings'
 const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
   enabled: true,
   maxCount: 10,
-  intervalMinutes: 60,
+  intervalMinutes: 1440,
   lastBackupAt: null
 }
 
