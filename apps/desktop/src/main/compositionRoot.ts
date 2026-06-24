@@ -17,6 +17,7 @@ import { HostImportExportService } from './hosts/HostImportExportService'
 import { LocalSecretBackend } from './secrets/LocalSecretBackend'
 import { HashicorpVaultBackend } from './secrets/HashicorpVaultBackend'
 import { SecretBackendService } from './secrets/SecretBackendService'
+import { SecretsRepository } from './secrets/SecretsRepository'
 import { VaultSettingsRepository } from './vault/VaultSettingsRepository'
 import { CredentialResolver } from './services/CredentialResolver'
 import { ConnectionLog } from './sessions/ConnectionLog'
@@ -24,6 +25,8 @@ import { UxProfileRepository } from './ux/UxProfileRepository'
 import { SessionFactory } from './sessions/SessionFactory'
 import { SessionManager } from './sessions/SessionManager'
 import { AppPreferencesRepository } from './preferences/AppPreferencesRepository'
+import { appImportExportService as _appIE } from './settings/appImportExportServiceInstance'
+import { reportRepository } from './reports/ReportRepository'
 
 // ── Leaf singletons ────────────────────────────────────────────────────────────
 
@@ -66,7 +69,13 @@ export const sessionManager = new SessionManager(
   sessionFactory
 )
 
+export const secretsRepository = new SecretsRepository()
+
 export const hostImportExportService = new HostImportExportService(
   hostRepository,
   profileRepository
 )
+
+export const appImportExportService = _appIE
+
+export { reportRepository }

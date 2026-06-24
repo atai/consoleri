@@ -1,13 +1,26 @@
-import { app } from 'electron'
-import { join } from 'path'
+import { is } from '@electron-toolkit/utils'
+import { nativeImage, type NativeImage } from 'electron'
+import winIcon from '../../build/icon.ico?asset'
+import macIcon from '../../build/icon.icns?asset'
+import linuxIcon from '../../build/icon.png?asset'
 
 export const APP_NAME = 'Consoleri'
 
 export function appIconPath(): string {
-  if (app.isPackaged) {
-    // In the packaged app, icon.ico is placed outside the ASAR via extraResources.
-    return join(process.resourcesPath, 'icon.ico')
+  switch (process.platform) {
+    case 'win32':
+      return winIcon
+    case 'darwin':
+      return macIcon
+    default:
+      return linuxIcon
   }
-  // Dev: __dirname = out/main/ → ../../build/ = apps/desktop/build/
-  return join(__dirname, '../../build/icon.ico')
+}
+
+export function appIcon(): NativeImage {
+  const image = nativeImage.createFromPath(appIconPath())
+  if (image.isEmpty() && is.dev) {
+    console.warn(`[appBranding] Failed to load app icon from ${appIconPath()}`)
+  }
+  return image
 }

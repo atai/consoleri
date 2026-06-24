@@ -2,12 +2,7 @@ export type OsType = 'windows' | 'linux' | 'macos' | 'unknown'
 export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
 
-export type SessionOpenMode = 'workspace' | 'window'
-
-export interface AppSettings {
-  autoOpenConnectionLog: boolean
-  sessionOpenMode: SessionOpenMode
-}
+export type { SessionOpenMode, AppSettings } from '@consoleri/core'
 export type SessionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export type { HostLogVerbosity, UxProfile, UxProfileInput, TerminalAppearance, ChromeAppearance, HostListViewSettings, HostListGroupBy, HostListSortBy, HostListSortDir, HostListGroupFilter, HostListSection, MapViewSettings, MapViewMode, AppView, Report, ReportInput, ReportType, ReportConfig, ReportResult, ReportHostEntry, ReportHostStatus, ConnectivityTestConfig, ConnectivityTestEntry, ConnectivityTestResult, ConnectivityTestHostResult, InventoryConfig, InventoryEntry, InventoryResult, InventoryHostResult, InventoryHostData, CustomTestConfig, CustomTestEntry, CustomTestCommand, CustomTestResult, CustomTestHostResult, CustomTestCommandResult, ReportProgressEvent, VaultSettings, VaultSettingsUpdate, VaultStatus, VaultAuthMethod, SecretBackendKind } from '@consoleri/core'
@@ -213,6 +208,7 @@ export const IPC_CHANNELS = {
   hostsUpdate: 'hosts:update',
   hostsDelete: 'hosts:delete',
   hostsImport: 'hosts:import',
+  hostsImportFromFile: 'hosts:import-from-file',
   hostsExport: 'hosts:export',
   hostsExportToFile: 'hosts:export-to-file',
   groupsList: 'hosts:groups:list',
@@ -290,5 +286,29 @@ export const IPC_CHANNELS = {
   vaultTestConnection: 'vault:testConnection',
   vaultLogin: 'vault:login',
   vaultLogout: 'vault:logout',
-  vaultStatus: 'vault:status'
+  vaultStatus: 'vault:status',
+  appExport: 'app:export',
+  appExportToFile: 'app:export-to-file',
+  appImportFromFile: 'app:import-from-file',
+  backupGetSettings: 'backup:get-settings',
+  backupUpdateSettings: 'backup:update-settings',
+  backupList: 'backup:list',
+  backupCreateNow: 'backup:create-now',
+  backupRestore: 'backup:restore',
+  backupDelete: 'backup:delete',
+  backupOpenFolder: 'backup:open-folder'
 } as const
+
+export interface BackupSettings {
+  enabled: boolean
+  maxCount: number
+  intervalMinutes: number
+  lastBackupAt: string | null
+}
+
+export interface BackupInfo {
+  id: string
+  filename: string
+  createdAt: string
+  sizeBytes: number
+}

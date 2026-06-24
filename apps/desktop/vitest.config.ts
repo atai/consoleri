@@ -4,6 +4,7 @@ import { ironrdpWasmPlugin } from './src/renderer/plugins/ironrdpWasmPlugin'
 
 export default defineConfig({
   test: {
+    name: 'desktop-renderer',
     environment: 'jsdom',
     include: ['src/renderer/**/*.test.{ts,tsx}'],
     coverage: {

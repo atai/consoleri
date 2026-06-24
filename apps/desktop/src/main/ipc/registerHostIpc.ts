@@ -54,6 +54,10 @@ export function registerHostIpc(): void {
     return hostImportExportService.importHosts(payload)
   })
 
+  ipcMain.handle(IPC_CHANNELS.hostsImportFromFile, () => {
+    return hostImportExportService.importHostsFromFile()
+  })
+
   ipcMain.handle(IPC_CHANNELS.hostsExport, () => {
     return hostImportExportService.exportHostsBundle()
   })

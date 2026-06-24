@@ -25,7 +25,7 @@ export const HostFilterSchema = z.object({
   search: z.string().optional(),
   tags: z.array(z.string()).optional(),
   groupId: z.string().nullable().optional()
-})
+}).default({})
 
 // ── HostInput ─────────────────────────────────────────────────────────────────
 

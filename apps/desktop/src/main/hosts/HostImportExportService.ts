@@ -1,10 +1,11 @@
 import { dialog } from 'electron'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import {
   buildHostsExportDocument,
   groupCreateFromExportItem,
   hostCreateFromExportItem,
   hostRelationPatchFromExportItem,
+  normalizeHostLogVerbosity,
   parseHostsImportPayload,
   profileCreateFromExportItem,
   resolveHostProfileLink,
@@ -13,6 +14,7 @@ import {
   type HostsExportDocument
 } from '@consoleri/core'
 import type { Host } from '../../shared/types'
+import { getDatabase } from '../db/database'
 import { uxProfileRepository } from '../ux/UxProfileRepository'
 import type { HostRepository } from './HostRepository'
 import type { ProfileRepository } from './ProfileRepository'
@@ -49,6 +51,21 @@ export class HostImportExportService {
   importHosts(payload: unknown): Promise<Host[]> {
     const doc = parseHostsImportPayload(payload)
     return this.importHostsBundle(doc)
+  }
+
+  async importHostsFromFile(): Promise<{ hosts: Host[] } | { canceled: true }> {
+    const result = await dialog.showOpenDialog({
+      title: 'Import hosts JSON',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true }
+    }
+    const raw = readFileSync(result.filePaths[0], 'utf8')
+    const doc = parseHostsImportPayload(raw)
+    const hosts = await this.importHostsBundle(doc)
+    return { hosts }
   }
 
   async importHostsBundle(doc: HostsExportDocument): Promise<Host[]> {
@@ -95,5 +112,79 @@ export class HostImportExportService {
     }
 
     return createdHosts.map((host) => this.hostRepo.getHost(host.id) ?? host)
+  }
+
+  /**
+   * Full-replace import: clear all existing hosts/groups/profiles/links and
+   * re-insert with original IDs preserved (used by full-app restore).
+   */
+  importHostsBundleReplace(doc: HostsExportDocument): void {
+    const db = getDatabase()
+    const now = new Date().toISOString()
+    const validUxProfileIds = new Set(uxProfileRepository.list().map((p) => p.id))
+
+    db.exec(
+      'DELETE FROM host_profile_links; DELETE FROM connection_profiles; DELETE FROM hosts; DELETE FROM host_groups'
+    )
+
+    for (const group of sortGroupsForImport(doc.groups)) {
+      const parentId = group.parentId ?? null
+      db.prepare(
+        'INSERT INTO host_groups (id, name, parent_id, sort_order) VALUES (?, ?, ?, ?)'
+      ).run(group.exportId, group.name, parentId, group.sortOrder)
+    }
+
+    for (const host of doc.hosts) {
+      const uxProfileId = validUxProfileIds.has(host.uxProfileId ?? '')
+        ? host.uxProfileId
+        : null
+      db.prepare(
+        `INSERT INTO hosts (id, name, hostname, port, os_type, tags_json, group_id, notes,
+          default_profile_id, ux_profile_id, log_verbosity, related_hosts_json,
+          gateway_host_id, http_endpoint, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        host.exportId,
+        host.name,
+        host.hostname,
+        host.port,
+        host.osType,
+        JSON.stringify(host.tags),
+        host.groupId ?? null,
+        host.notes,
+        host.defaultProfileId ?? null,
+        uxProfileId,
+        normalizeHostLogVerbosity(host.logVerbosity),
+        JSON.stringify(host.relatedHostIds),
+        host.gatewayHostId ?? null,
+        host.httpEndpoint ?? null,
+        now,
+        now
+      )
+    }
+
+    for (const profile of doc.profiles) {
+      db.prepare(
+        `INSERT INTO connection_profiles
+           (id, name, protocol, shell, username, auth_method, credential_ref, jump_host_id, extra_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        profile.exportId,
+        profile.name,
+        profile.protocol,
+        profile.shell ?? null,
+        profile.username ?? null,
+        profile.authMethod,
+        profile.credentialRef ?? null,
+        profile.jumpHostId ?? null,
+        JSON.stringify(profile.extra ?? {})
+      )
+    }
+
+    for (const link of doc.links) {
+      db.prepare(
+        'INSERT OR IGNORE INTO host_profile_links (host_id, profile_id) VALUES (?, ?)'
+      ).run(link.hostId, link.profileId)
+    }
   }
 }

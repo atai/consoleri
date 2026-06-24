@@ -6,12 +6,13 @@ describe('attachClipboardHandlers', () => {
   let keyHandler: ((event: KeyboardEvent) => boolean) | undefined
   const paste = vi.fn()
   const readText = vi.fn(async () => 'hello')
-  const container = document.createElement('div')
+  let container: HTMLDivElement
 
   beforeEach(() => {
     keyHandler = undefined
     paste.mockClear()
     readText.mockClear()
+    container = document.createElement('div')
 
     window.consoleri = {
       clipboard: {

@@ -4,9 +4,8 @@ import { ResizableSidebar } from './ResizableSidebar'
 import { Sidebar } from './Sidebar'
 import { MosaicWorkspace } from '../workspace/MosaicWorkspace'
 import { HostMapView } from '../map/HostMapView'
-import { VaultSettingsPanel } from '../vault/VaultSettingsPanel'
-import { UxProfileManager } from '../ux/UxProfileManager'
 import { ReportsManager } from '../reports/ReportsManager'
+import { SettingsPanel } from '../settings/SettingsPanel'
 import { useAppStore } from '../../stores/appStore'
 import { useSessionWorkspaceStore } from '../../stores/sessionWorkspaceStore'
 import { usePreferencesStore } from '../../stores/preferencesStore'
@@ -105,14 +104,9 @@ export function AppShell({ workspaceReady }: AppShellProps): React.JSX.Element {
           <ReportsManager />
         </main>
       )}
-      {appView === 'profile' && (
+      {appView === 'settings' && (
         <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#161b22]">
-          <UxProfileManager />
-        </main>
-      )}
-      {appView === 'vault' && (
-        <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#161b22]">
-          <VaultSettingsPanel />
+          <SettingsPanel />
         </main>
       )}
     </div>

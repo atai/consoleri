@@ -30,7 +30,8 @@ import type {
   VaultSettingsUpdate,
   VaultStatus
 } from '../shared/types'
-import type { HostsExportDocument } from '@consoleri/core'
+import type { HostsExportDocument, AppExportDocument } from '@consoleri/core'
+import type { BackupSettings, BackupInfo } from '../shared/types'
 
 export interface ConsoleriAPI {
   hosts: {
@@ -40,6 +41,7 @@ export interface ConsoleriAPI {
     update: (id: string, input: Partial<HostInput>) => Promise<Host>
     delete: (id: string) => Promise<void>
     import: (payload: unknown) => Promise<Host[]>
+    importFromFile: () => Promise<{ hosts: Host[] } | { canceled: true }>
     export: () => Promise<HostsExportDocument>
     exportToFile: () => Promise<{ path: string } | { canceled: true }>
   }
@@ -161,16 +163,31 @@ export interface ConsoleriAPI {
     login: () => Promise<void>
     logout: () => Promise<void>
   }
+  app: {
+    export: () => Promise<AppExportDocument>
+    exportToFile: () => Promise<{ path: string } | { canceled: true }>
+    importFromFile: () => Promise<void>
+  }
+  backup: {
+    getSettings: () => Promise<BackupSettings>
+    updateSettings: (patch: Partial<BackupSettings>) => Promise<BackupSettings>
+    list: () => Promise<BackupInfo[]>
+    createNow: () => Promise<BackupInfo>
+    restore: (id: string) => Promise<void>
+    delete: (id: string) => Promise<void>
+    openFolder: () => Promise<void>
+  }
 }
 
 const consoleri: ConsoleriAPI = {
   hosts: {
-    list: (filter) => ipcRenderer.invoke(IPC_CHANNELS.hostsList, filter),
+    list: (filter) => ipcRenderer.invoke(IPC_CHANNELS.hostsList, filter ?? {}),
     get: (id) => ipcRenderer.invoke(IPC_CHANNELS.hostsGet, id),
     create: (input) => ipcRenderer.invoke(IPC_CHANNELS.hostsCreate, input),
     update: (id, input) => ipcRenderer.invoke(IPC_CHANNELS.hostsUpdate, id, input),
     delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.hostsDelete, id),
     import: (payload) => ipcRenderer.invoke(IPC_CHANNELS.hostsImport, payload),
+    importFromFile: () => ipcRenderer.invoke(IPC_CHANNELS.hostsImportFromFile),
     export: () => ipcRenderer.invoke(IPC_CHANNELS.hostsExport),
     exportToFile: () => ipcRenderer.invoke(IPC_CHANNELS.hostsExportToFile)
   },
@@ -310,6 +327,20 @@ const consoleri: ConsoleriAPI = {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.vaultStatus),
     login: () => ipcRenderer.invoke(IPC_CHANNELS.vaultLogin),
     logout: () => ipcRenderer.invoke(IPC_CHANNELS.vaultLogout)
+  },
+  app: {
+    export: () => ipcRenderer.invoke(IPC_CHANNELS.appExport),
+    exportToFile: () => ipcRenderer.invoke(IPC_CHANNELS.appExportToFile),
+    importFromFile: () => ipcRenderer.invoke(IPC_CHANNELS.appImportFromFile)
+  },
+  backup: {
+    getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.backupGetSettings),
+    updateSettings: (patch) => ipcRenderer.invoke(IPC_CHANNELS.backupUpdateSettings, patch),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.backupList),
+    createNow: () => ipcRenderer.invoke(IPC_CHANNELS.backupCreateNow),
+    restore: (id) => ipcRenderer.invoke(IPC_CHANNELS.backupRestore, id),
+    delete: (id) => ipcRenderer.invoke(IPC_CHANNELS.backupDelete, id),
+    openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.backupOpenFolder)
   }
 }
 

@@ -22,7 +22,7 @@ const reportApi = {
   },
   writeClipboard: (text: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text),
-  listHosts: () => ipcRenderer.invoke(IPC_CHANNELS.hostsList),
+  listHosts: () => ipcRenderer.invoke(IPC_CHANNELS.hostsList, {}),
   listProfiles: (hostId?: string) => ipcRenderer.invoke(IPC_CHANNELS.profilesList, hostId)
 }
 

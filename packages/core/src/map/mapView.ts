@@ -1,7 +1,7 @@
 export const MAP_VIEW_VERSION = 1
 
 export type MapViewMode = 'logical' | 'network'
-export type AppView = 'list' | 'map' | 'profile' | 'reports' | 'vault'
+export type AppView = 'list' | 'map' | 'settings' | 'reports'
 
 export interface MapViewSettings {
   version: number
@@ -19,14 +19,18 @@ export function normalizeMapViewSettings(input: unknown): MapViewSettings {
   if (typeof input !== 'object' || input === null) {
     return { ...DEFAULT_MAP_VIEW }
   }
-  const raw = input as Partial<MapViewSettings>
+  const raw = input as Partial<MapViewSettings & { appView: string }>
+  // Migrate legacy values: 'profile' and 'vault' collapse to 'settings'
+  const rawView = raw.appView
   const appView =
-    raw.appView === 'map' ||
-    raw.appView === 'profile' ||
-    raw.appView === 'list' ||
-    raw.appView === 'reports'
-      ? raw.appView
-      : DEFAULT_MAP_VIEW.appView
+    rawView === 'map' ||
+    rawView === 'list' ||
+    rawView === 'reports' ||
+    rawView === 'settings'
+      ? (rawView as AppView)
+      : rawView === 'profile' || rawView === 'vault'
+        ? 'settings'
+        : DEFAULT_MAP_VIEW.appView
   const mapMode =
     raw.mapMode === 'network' || raw.mapMode === 'logical'
       ? raw.mapMode

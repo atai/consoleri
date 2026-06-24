@@ -10,6 +10,8 @@ const PACKAGE_FILES = [
   join(root, 'packages/core/package.json'),
 ]
 
+const APP_VERSION_FILE = join(root, 'apps/desktop/src/shared/appVersion.ts')
+
 const BUMP_TYPES = new Set(['patch', 'minor', 'major'])
 
 function readVersion() {
@@ -35,12 +37,25 @@ function bumpSemver(version, bumpType) {
   }
 }
 
+function setAppVersion(version) {
+  const content = readFileSync(APP_VERSION_FILE, 'utf8')
+  const updated = content.replace(
+    /^export const APP_VERSION = '[^']*'$/m,
+    `export const APP_VERSION = '${version}'`
+  )
+  if (updated === content) {
+    throw new Error(`Could not update APP_VERSION in ${APP_VERSION_FILE} — pattern not found`)
+  }
+  writeFileSync(APP_VERSION_FILE, updated, 'utf8')
+}
+
 function setVersion(version) {
   for (const file of PACKAGE_FILES) {
     const pkg = JSON.parse(readFileSync(file, 'utf8'))
     pkg.version = version
     writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
   }
+  setAppVersion(version)
 }
 
 function usage() {

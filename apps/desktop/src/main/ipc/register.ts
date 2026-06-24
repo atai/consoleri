@@ -6,6 +6,7 @@ import { registerKeysIpc } from './registerKeysIpc'
 import { registerUxProfilesIpc } from './registerUxProfilesIpc'
 import { registerPreferencesIpc } from './registerPreferencesIpc'
 import { registerReportIpc } from './registerReportIpc'
+import { registerAppIpc } from './registerAppIpc'
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
   registerHostIpc()
@@ -15,4 +16,5 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void
   registerUxProfilesIpc()
   registerPreferencesIpc()
   registerReportIpc(getWindow)
+  registerAppIpc()
 }

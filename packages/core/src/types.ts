@@ -1,6 +1,13 @@
 export type OsType = 'windows' | 'linux' | 'macos' | 'unknown'
 export type Protocol = 'ssh' | 'local_pty' | 'rdp' | 'vnc' | 'wsl'
 export type AuthMethod = 'password' | 'key' | 'none'
+
+export type SessionOpenMode = 'workspace' | 'window'
+
+export interface AppSettings {
+  autoOpenConnectionLog: boolean
+  sessionOpenMode: SessionOpenMode
+}
 export type { HostLogVerbosity } from './logging/verbosity'
 import type { HostLogVerbosity } from './logging/verbosity'
 

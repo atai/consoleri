@@ -30,6 +30,7 @@ const {
     updateHost: vi.fn(),
     deleteHost: vi.fn(),
     importHosts: vi.fn(),
+    importHostsFromFile: vi.fn(),
     exportHostsBundle: vi.fn(),
     exportHostsToFile: vi.fn(),
     listGroups: vi.fn(),
@@ -132,6 +133,7 @@ vi.mock('../hosts/WorkspaceRepository', () => ({ workspaceRepository: mockHostRe
 vi.mock('../hosts/hostImportExportServiceInstance', () => ({
   hostImportExportService: {
     importHosts: mockHostRepo.importHosts,
+    importHostsFromFile: mockHostRepo.importHostsFromFile,
     exportHostsBundle: mockHostRepo.exportHostsBundle,
     exportHostsToFile: mockHostRepo.exportHostsToFile
   }
@@ -158,6 +160,24 @@ vi.mock('../preferences/AppPreferencesRepository', () => ({
 }))
 vi.mock('../reports/ReportRepository', () => ({ reportRepository: mockReportRepo }))
 vi.mock('../reports/ReportRunner', () => ({ reportRunner: mockReportRunner }))
+vi.mock('../settings/appImportExportServiceInstance', () => ({
+  appImportExportService: {
+    exportAppBundle: vi.fn(),
+    exportAppToFile: vi.fn(),
+    importAppFromFile: vi.fn()
+  }
+}))
+vi.mock('../backup/backupServiceInstance', () => ({
+  backupService: {
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
+    listBackups: vi.fn(),
+    createBackupNow: vi.fn(),
+    restoreBackup: vi.fn(),
+    deleteBackup: vi.fn(),
+    openBackupFolder: vi.fn()
+  }
+}))
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 import { registerIpcHandlers } from './register'
@@ -181,6 +201,7 @@ describe('IPC channel inventory', () => {
     IPC_CHANNELS.hostsUpdate,
     IPC_CHANNELS.hostsDelete,
     IPC_CHANNELS.hostsImport,
+    IPC_CHANNELS.hostsImportFromFile,
     IPC_CHANNELS.hostsExport,
     IPC_CHANNELS.hostsExportToFile,
     IPC_CHANNELS.groupsList,
@@ -250,7 +271,17 @@ describe('IPC channel inventory', () => {
     IPC_CHANNELS.reportsUpdate,
     IPC_CHANNELS.reportsDelete,
     IPC_CHANNELS.reportsRun,
-    IPC_CHANNELS.reportsOpenWindow
+    IPC_CHANNELS.reportsOpenWindow,
+    IPC_CHANNELS.appExport,
+    IPC_CHANNELS.appExportToFile,
+    IPC_CHANNELS.appImportFromFile,
+    IPC_CHANNELS.backupGetSettings,
+    IPC_CHANNELS.backupUpdateSettings,
+    IPC_CHANNELS.backupList,
+    IPC_CHANNELS.backupCreateNow,
+    IPC_CHANNELS.backupRestore,
+    IPC_CHANNELS.backupDelete,
+    IPC_CHANNELS.backupOpenFolder
   ] as const
 
   const EXPECTED_ON_CHANNELS = [
@@ -290,6 +321,14 @@ describe('hosts routing', () => {
     expect(mockHostRepo.listHosts).toHaveBeenCalledWith({})
   })
 
+  it('hosts:list with undefined filter → defaults to empty filter', async () => {
+    vi.mocked(mockHostRepo.listHosts).mockReturnValue([])
+    await expect(
+      handleMap.get(IPC_CHANNELS.hostsList)!(FAKE_EVENT, undefined)
+    ).resolves.not.toThrow()
+    expect(mockHostRepo.listHosts).toHaveBeenCalledWith({})
+  })
+
   it('hosts:get → hostRepository.getHost', async () => {
     await handleMap.get(IPC_CHANNELS.hostsGet)!(FAKE_EVENT, 'host-1')
     expect(mockHostRepo.getHost).toHaveBeenCalledWith('host-1')
@@ -315,6 +354,11 @@ describe('hosts routing', () => {
     const payload = { version: 1, hosts: [] }
     await handleMap.get(IPC_CHANNELS.hostsImport)!(FAKE_EVENT, payload)
     expect(mockHostRepo.importHosts).toHaveBeenCalledWith(payload)
+  })
+
+  it('hosts:import-from-file → hostRepository.importHostsFromFile', async () => {
+    await handleMap.get(IPC_CHANNELS.hostsImportFromFile)!(FAKE_EVENT)
+    expect(mockHostRepo.importHostsFromFile).toHaveBeenCalled()
   })
 
   it('hosts:export → hostRepository.exportHostsBundle', async () => {

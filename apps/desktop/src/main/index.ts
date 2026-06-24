@@ -6,6 +6,7 @@ import { APP_NAME, appIconPath } from './appBranding'
 import { getDatabase, closeDatabase } from './db/database'
 import { registerIpcHandlers } from './ipc/register'
 import { sessionManager } from './compositionRoot'
+import { backupService } from './backup/backupServiceInstance'
 
 // Must be called before app.whenReady() and before any call to app.getPath('userData').
 // This redirects ALL Electron storage (SQLite, localStorage, IndexedDB, cookies)
@@ -63,6 +64,7 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers(() => mainWindow)
+  backupService.startScheduler()
 
   createWindow()
 
@@ -72,6 +74,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  backupService.stopScheduler()
   sessionManager.closeAll()
   closeDatabase()
 })

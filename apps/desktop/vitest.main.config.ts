@@ -3,6 +3,7 @@ import path from 'node:path'
 
 export default defineConfig({
   test: {
+    name: 'desktop-main',
     environment: 'node',
     include: ['src/main/**/*.test.ts'],
     coverage: {

@@ -149,6 +149,20 @@ export function HostBrowser(): React.JSX.Element {
     }
   }
 
+  const handleImportFromFile = async (): Promise<void> => {
+    try {
+      const result = await window.consoleri.hosts.importFromFile()
+      if ('canceled' in result) return
+      setShowImport(false)
+      refreshHosts()
+      refreshAllHostTags()
+      refreshAllHosts()
+      refreshGroups()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Import failed')
+    }
+  }
+
   const handleExport = async (): Promise<void> => {
     try {
       const result = await window.consoleri.hosts.exportToFile()
@@ -338,6 +352,18 @@ export function HostBrowser(): React.JSX.Element {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {showImport && (
           <div className="border-b border-[#30363d] p-2">
+            <button
+              type="button"
+              onClick={handleImportFromFile}
+              className="mb-1 w-full rounded border border-[#30363d] py-1 text-xs text-gray-300 hover:bg-[#21262d]"
+            >
+              Choose file…
+            </button>
+            <div className="my-1 flex items-center gap-1 text-[10px] text-gray-500">
+              <span className="flex-1 border-t border-[#30363d]" />
+              or paste JSON
+              <span className="flex-1 border-t border-[#30363d]" />
+            </div>
             <textarea
               className="w-full rounded border border-[#30363d] bg-[#0d1117] p-2 text-xs text-gray-300"
               rows={4}
