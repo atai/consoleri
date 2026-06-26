@@ -13,6 +13,11 @@ import { backupService } from './backup/backupServiceInstance'
 // to our custom data directory so dev and packaged builds never share state.
 app.setPath('userData', getDataDir())
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -52,6 +57,14 @@ function createWindow(): void {
   sessionManager.setWindow(mainWindow)
 }
 
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    if (!mainWindow.isVisible()) mainWindow.show()
+    mainWindow.focus()
+  }
+})
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.consoleri.desktop')
   if (process.platform === 'darwin') {
@@ -84,3 +97,4 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+}

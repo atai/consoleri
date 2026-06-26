@@ -52,9 +52,42 @@ function toConnectConfig(
   return config
 }
 
-function createNoDelaySocket(host: string, port: number): net.Socket {
+interface SocketLogContext {
+  log: ConnectionLog
+  sessionId: string
+  label: string
+}
+
+function createNoDelaySocket(host: string, port: number, logCtx?: SocketLogContext): net.Socket {
   const sock = net.connect({ host, port })
   sock.setNoDelay(true)
+
+  if (logCtx) {
+    const { log, sessionId, label } = logCtx
+    const tag = `[tcp:${label}]`
+    const meta = { source: 'socket' }
+    log.append(sessionId, 'debug', `${tag} Connecting TCP to ${host}:${port}`, meta)
+    sock.on('lookup', (err, address, family) => {
+      if (err) {
+        log.append(sessionId, 'debug', `${tag} DNS lookup failed for ${host}: ${err.message}`, meta)
+      } else {
+        log.append(sessionId, 'debug', `${tag} Resolved ${host} -> ${address} (IPv${family})`, meta)
+      }
+    })
+    sock.on('connect', () => {
+      log.append(sessionId, 'debug', `${tag} TCP connected to ${host}:${port}`, meta)
+    })
+    sock.on('timeout', () => {
+      log.append(sessionId, 'debug', `${tag} TCP socket timeout`, meta)
+    })
+    sock.on('error', (err) => {
+      log.append(sessionId, 'debug', `${tag} TCP socket error: ${err.message}`, meta)
+    })
+    sock.on('close', (hadError) => {
+      log.append(sessionId, 'debug', `${tag} TCP socket closed${hadError ? ' (with error)' : ''}`, meta)
+    })
+  }
+
   return sock
 }
 
@@ -103,7 +136,11 @@ function connectWithJump(
       })
       .connect({
         ...bastionConfig,
-        sock: createNoDelaySocket(bastionConfig.host!, bastionConfig.port ?? 22)
+        sock: createNoDelaySocket(bastionConfig.host!, bastionConfig.port ?? 22, {
+          log,
+          sessionId,
+          label: 'jump'
+        })
       })
   })
 }
@@ -158,7 +195,11 @@ export class SshSession extends BaseTransport {
         })
         c.connect({
           ...targetConfig,
-          sock: createNoDelaySocket(targetConfig.host!, targetConfig.port ?? 22)
+          sock: createNoDelaySocket(targetConfig.host!, targetConfig.port ?? 22, {
+            log,
+            sessionId,
+            label: 'target'
+          })
         })
       })
     }
