@@ -74,6 +74,7 @@ export function HostProfilesSection({
       {showAddForm && (
         <div className="mb-2 rounded border border-[#30363d] bg-[#0d1117]">
           <ProfileForm
+            compact
             linkHostId={host.id}
             host={host}
             hosts={hosts}
@@ -91,6 +92,7 @@ export function HostProfilesSection({
             editingProfileId === profile.id ? (
               <li key={profile.id} className="rounded border border-[#30363d] bg-[#0d1117]">
                 <ProfileForm
+                  compact
                   linkHostId={host.id}
                   profile={profile}
                   host={host}

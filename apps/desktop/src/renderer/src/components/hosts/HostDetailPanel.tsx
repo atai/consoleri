@@ -41,22 +41,21 @@ export function HostDetailPanel({
   if (editing) {
     return (
       <div className={PANEL_CLASS}>
-        <div className={PANEL_BODY_CLASS}>
-          <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-blue-400/80">
-            Edit host
-          </div>
-          <HostForm
-            host={host}
-            profiles={profiles}
-            onConnect={onConnect}
-            onProfilesChanged={onProfilesChanged}
-            onSave={() => {
-              onCancelEdit()
-              onHostUpdated()
-            }}
-            onCancel={onCancelEdit}
-          />
+        <div className="px-3 pt-3 text-[10px] font-medium uppercase tracking-wide text-blue-400/80">
+          Edit host
         </div>
+        <HostForm
+          compact
+          host={host}
+          profiles={profiles}
+          onConnect={onConnect}
+          onProfilesChanged={onProfilesChanged}
+          onSave={() => {
+            onCancelEdit()
+            onHostUpdated()
+          }}
+          onCancel={onCancelEdit}
+        />
       </div>
     )
   }
