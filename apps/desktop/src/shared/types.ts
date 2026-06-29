@@ -277,6 +277,7 @@ export const IPC_CHANNELS = {
   reportsDelete: 'reports:delete',
   reportsRun: 'reports:run',
   reportsOpenWindow: 'reports:openWindow',
+  reportsSaveHtml: 'reports:saveHtml',
   reportProgress: 'report:progress',
   reportUpdated: 'report:updated',
   clipboardReadText: 'clipboard:readText',

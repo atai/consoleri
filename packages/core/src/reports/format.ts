@@ -31,6 +31,12 @@ export {
   formatInventoryReportText,
   summarizeInventoryResult
 } from './formatInventory'
+export {
+  formatConnectivityReportHtml,
+  formatCustomTestReportHtml,
+  formatInventoryReportHtml,
+  formatReportHtml
+} from './formatHtml'
 
 export function formatReportMarkdown(
   report: Report,

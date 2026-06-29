@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatReportHtml,
   formatReportMarkdown,
   formatReportText,
   summarizeReportResult,
@@ -258,6 +259,39 @@ describe('formatReportText', () => {
     expect(text).toContain('ping:OK ssh:OK')
     expect(text).toContain('ping:FAIL ssh:FAIL')
     expect(text).toContain('Summary: ping 1 ok, 1 fail | ssh 1 ok, 1 fail, 0 skipped')
+  })
+})
+
+describe('formatReportHtml', () => {
+  it('produces self-contained HTML with table and error details', () => {
+    const html = formatReportHtml(sampleConnectivityReport, sampleConnectivityResult, labels)
+    expect(html).toMatch(/^<!DOCTYPE html>/)
+    expect(html).toContain('<title>Prod check</title>')
+    expect(html).toContain('<th>Host</th>')
+    expect(html).toContain('web-01')
+    expect(html).toContain('status-ok')
+    expect(html).toContain('status-fail')
+    expect(html).toContain('Errors &amp; details')
+    expect(html).toContain('Connection timed out')
+    expect(html).toContain('Request timed out')
+  })
+
+  it('includes HTTP column when http results exist', () => {
+    const html = formatReportHtml(
+      sampleConnectivityReport,
+      {
+        ...sampleConnectivityResult,
+        entries: [
+          {
+            ...sampleConnectivityResult.entries[0],
+            httpStatusCode: 200
+          }
+        ]
+      },
+      labels
+    )
+    expect(html).toContain('<th>HTTP</th>')
+    expect(html).toContain('>200<')
   })
 })
 

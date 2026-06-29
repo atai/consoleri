@@ -1,4 +1,5 @@
-import { ipcMain, type BrowserWindow } from 'electron'
+import { dialog, ipcMain, type BrowserWindow } from 'electron'
+import { writeFileSync } from 'fs'
 import { IPC_CHANNELS } from '../../shared/types'
 import type { ReportInput } from '../../shared/types'
 import { Id, ReportInputSchema } from '../../shared/ipcSchemas'
@@ -47,5 +48,27 @@ export function registerReportIpc(getWindow: () => BrowserWindow | null): void {
       openReportWindow(reportId, getWindow())
       return Promise.resolve()
     })
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.reportsSaveHtml,
+    createHandler(
+      z.object({
+        content: z.string(),
+        defaultName: z.string()
+      }),
+      ({ content, defaultName }) => {
+        const result = dialog.showSaveDialogSync({
+          title: 'Save report as HTML',
+          defaultPath: defaultName,
+          filters: [{ name: 'HTML', extensions: ['html'] }]
+        })
+        if (!result) {
+          return Promise.resolve({ canceled: true as const })
+        }
+        writeFileSync(result, content, 'utf8')
+        return Promise.resolve({ path: result })
+      }
+    )
   )
 }

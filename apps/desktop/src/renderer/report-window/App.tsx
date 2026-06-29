@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { formatReportMarkdown, formatReportText } from '@consoleri/core'
+import { formatReportHtml, formatReportMarkdown, formatReportText } from '@consoleri/core'
 import type {
   ConnectionProfile,
   Host,
@@ -20,10 +20,23 @@ declare global {
       run: (reportId: string) => Promise<ReportResult>
       onProgress: (cb: (event: ReportProgressEvent) => void) => () => void
       writeClipboard: (text: string) => Promise<void>
+      saveHtml: (
+        content: string,
+        defaultName: string
+      ) => Promise<{ path: string } | { canceled: true }>
       listHosts: () => Promise<Host[]>
       listProfiles: (hostId?: string) => Promise<ConnectionProfile[]>
     }
   }
+}
+
+function reportHtmlDefaultName(reportName: string): string {
+  const slug = reportName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  const date = new Date().toISOString().slice(0, 10)
+  return `consoleri-report-${slug || 'report'}-${date}.html`
 }
 
 function emptyResultMessage(type: Report['type']): string {
@@ -118,6 +131,16 @@ export function ReportWindowApp(): React.JSX.Element {
     setTimeout(() => setCopyFeedback(null), 2000)
   }
 
+  const handleSaveHtml = async (): Promise<void> => {
+    if (!report || !result) return
+    const html = formatReportHtml(report, result, labels)
+    const saveResult = await window.reportApi.saveHtml(html, reportHtmlDefaultName(report.name))
+    if ('path' in saveResult) {
+      setCopyFeedback('HTML saved')
+      setTimeout(() => setCopyFeedback(null), 2000)
+    }
+  }
+
   if (!reportId) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-red-400">
@@ -188,6 +211,7 @@ export function ReportWindowApp(): React.JSX.Element {
       onRun={() => void handleRun()}
       onCopyText={() => void handleCopy('text')}
       onCopyMarkdown={() => void handleCopy('markdown')}
+      onSaveHtml={() => void handleSaveHtml()}
     >
       {renderResults()}
     </ReportWindowShell>

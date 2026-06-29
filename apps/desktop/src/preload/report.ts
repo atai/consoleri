@@ -22,6 +22,11 @@ const reportApi = {
   },
   writeClipboard: (text: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.clipboardWriteText, text),
+  saveHtml: (
+    content: string,
+    defaultName: string
+  ): Promise<{ path: string } | { canceled: true }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.reportsSaveHtml, { content, defaultName }),
   listHosts: () => ipcRenderer.invoke(IPC_CHANNELS.hostsList, {}),
   listProfiles: (hostId?: string) => ipcRenderer.invoke(IPC_CHANNELS.profilesList, hostId)
 }

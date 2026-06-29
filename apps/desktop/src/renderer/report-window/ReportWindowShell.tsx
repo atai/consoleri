@@ -41,6 +41,7 @@ interface ReportWindowShellProps {
   onRun: () => void
   onCopyText: () => void
   onCopyMarkdown: () => void
+  onSaveHtml: () => void
   children: ReactNode
 }
 
@@ -57,6 +58,7 @@ export function ReportWindowShell({
   onRun,
   onCopyText,
   onCopyMarkdown,
+  onSaveHtml,
   children
 }: ReportWindowShellProps): React.JSX.Element {
   const progressPercent =
@@ -100,6 +102,14 @@ export function ReportWindowShell({
               className="rounded border border-[#30363d] px-2 py-1 text-xs text-gray-300 hover:bg-[#21262d] disabled:opacity-40"
             >
               Copy MD
+            </button>
+            <button
+              type="button"
+              disabled={!canCopy}
+              onClick={onSaveHtml}
+              className="rounded border border-[#30363d] px-2 py-1 text-xs text-gray-300 hover:bg-[#21262d] disabled:opacity-40"
+            >
+              Save HTML
             </button>
             <button
               type="button"

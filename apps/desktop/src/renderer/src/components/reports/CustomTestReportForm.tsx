@@ -5,6 +5,7 @@ import type {
   ReportConfig,
   ReportHostEntry
 } from '@shared/types'
+import { ReportFormShell } from './ReportFormShell'
 import { ReportHostEntriesSection } from './ReportHostEntriesSection'
 
 interface CustomTestReportFormProps {
@@ -113,11 +114,29 @@ export function CustomTestReportForm({
   }
 
   return (
-    <div className="border-b border-[#30363d] bg-[#0d1117] p-4">
-      <h3 className="mb-3 text-sm font-medium text-gray-100">
-        {report ? 'Edit custom test' : 'New custom test'}
-      </h3>
-
+    <ReportFormShell
+      title={report ? 'Edit custom test' : 'New custom test'}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded px-3 py-1.5 text-sm text-gray-400 hover:bg-[#21262d] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      }
+    >
       <label className="mb-3 block text-sm">
         <span className="text-gray-400">Name</span>
         <input
@@ -212,26 +231,7 @@ export function CustomTestReportForm({
         </span>
       </label>
 
-      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className="rounded px-3 py-1.5 text-sm text-gray-400 hover:bg-[#21262d] disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={saving}
-          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500 disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+    </ReportFormShell>
   )
 }

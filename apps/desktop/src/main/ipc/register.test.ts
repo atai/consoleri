@@ -272,6 +272,7 @@ describe('IPC channel inventory', () => {
     IPC_CHANNELS.reportsDelete,
     IPC_CHANNELS.reportsRun,
     IPC_CHANNELS.reportsOpenWindow,
+    IPC_CHANNELS.reportsSaveHtml,
     IPC_CHANNELS.appExport,
     IPC_CHANNELS.appExportToFile,
     IPC_CHANNELS.appImportFromFile,
