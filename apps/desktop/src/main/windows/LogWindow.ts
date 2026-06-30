@@ -11,6 +11,7 @@ export interface LogWindowContext {
   kind?: LogWindowKind
   hostId?: string
   profileId?: string
+  fallbackLabel?: string
 }
 
 const logContexts = new Map<string, Required<Pick<LogWindowContext, 'kind'>> & LogWindowContext>()
@@ -19,17 +20,20 @@ export function registerLogContext(logId: string, context: LogWindowContext): vo
   logContexts.set(logId, {
     kind: context.kind ?? 'connection',
     hostId: context.hostId,
-    profileId: context.profileId
+    profileId: context.profileId,
+    fallbackLabel: context.fallbackLabel
   })
 }
 
 function resolveLogTitle(logId: string, explicit?: LogWindowContext): string {
-  const kind = explicit?.kind ?? logContexts.get(logId)?.kind ?? 'connection'
-  const hostId = explicit?.hostId ?? logContexts.get(logId)?.hostId
-  const profileId = explicit?.profileId ?? logContexts.get(logId)?.profileId
+  const stored = logContexts.get(logId)
+  const kind = explicit?.kind ?? stored?.kind ?? 'connection'
+  const hostId = explicit?.hostId ?? stored?.hostId
+  const profileId = explicit?.profileId ?? stored?.profileId
+  const fallbackLabel = explicit?.fallbackLabel ?? stored?.fallbackLabel
 
   if (hostId || profileId) {
-    return formatLogWindowTitle({ kind, hostId, profileId })
+    return formatLogWindowTitle({ kind, hostId, profileId, fallbackLabel })
   }
 
   const session = sessionManager.list().find((s) => s.id === logId)
@@ -42,7 +46,7 @@ function resolveLogTitle(logId: string, explicit?: LogWindowContext): string {
     })
   }
 
-  return formatLogWindowTitle({ kind })
+  return formatLogWindowTitle({ kind, fallbackLabel })
 }
 
 function buildLogQuery(logId: string, headerTitle: string): string {
