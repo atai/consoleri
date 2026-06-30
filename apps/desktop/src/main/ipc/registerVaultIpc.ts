@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../../shared/types'
 import type { VaultSettingsUpdate } from '../../shared/types'
 import { VaultSettingsUpdateSchema } from '../../shared/ipcSchemas'
@@ -6,7 +6,7 @@ import { createHandler } from './createHandler'
 import { vaultSettingsRepository } from '../vault/VaultSettingsRepository'
 import { startVaultOidcLogin, logoutVaultOidc } from '../vault/VaultOidcLogin'
 
-export function registerVaultIpc(): void {
+export function registerVaultIpc(_getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC_CHANNELS.vaultGetSettings, () => {
     return vaultSettingsRepository.getSettings()
   })

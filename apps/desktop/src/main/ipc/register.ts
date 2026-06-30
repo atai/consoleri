@@ -9,8 +9,8 @@ import { registerReportIpc } from './registerReportIpc'
 import { registerAppIpc } from './registerAppIpc'
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): void {
-  registerHostIpc()
-  registerVaultIpc()
+  registerHostIpc(getWindow)
+  registerVaultIpc(getWindow)
   registerSessionIpc(getWindow)
   registerKeysIpc(getWindow)
   registerUxProfilesIpc()

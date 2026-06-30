@@ -43,7 +43,13 @@ export function formatReportWindowTitle(reportName: string): string {
   return joinWindowTitle(reportName, 'Report', APP_NAME)
 }
 
-export type LogWindowKind = 'connection' | 'deploy'
+export type LogWindowKind = 'connection' | 'deploy' | 'vault'
+
+const LOG_KIND_LABEL: Record<LogWindowKind, string> = {
+  connection: 'Connection log',
+  deploy: 'Deploy log',
+  vault: 'Vault log'
+}
 
 export function formatLogWindowTitle(options: {
   kind: LogWindowKind
@@ -51,7 +57,7 @@ export function formatLogWindowTitle(options: {
   profileId?: string | null
   fallbackLabel?: string
 }): string {
-  const kindLabel = options.kind === 'deploy' ? 'Deploy log' : 'Connection log'
+  const kindLabel = LOG_KIND_LABEL[options.kind]
   const parts = hostProfileParts(options.hostId, options.profileId)
   if (parts.length === 0 && options.fallbackLabel) parts.push(options.fallbackLabel)
   return joinWindowTitle(...parts, kindLabel, APP_NAME)

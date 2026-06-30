@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, type BrowserWindow } from 'electron'
 import { z } from 'zod'
 import { IPC_CHANNELS } from '../../shared/types'
 import type { HostFilter, HostInput, ProfileInput } from '../../shared/types'
@@ -11,12 +11,13 @@ import {
   CredentialRefSchema
 } from '../../shared/ipcSchemas'
 import { createHandler } from './createHandler'
+import { withOperationalLogWindow } from './withOperationalLogWindow'
 import { hostRepository } from '../hosts/HostRepository'
 import { profileRepository } from '../hosts/ProfileRepository'
 import { hostImportExportService } from '../hosts/hostImportExportServiceInstance'
 import { secretBackendService } from '../secrets/SecretBackendService'
 
-export function registerHostIpc(): void {
+export function registerHostIpc(getWindow: () => BrowserWindow | null): void {
   // ── hosts ──────────────────────────────────────────────────────────────────
 
   ipcMain.handle(IPC_CHANNELS.hostsList,
@@ -84,13 +85,13 @@ export function registerHostIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.profilesCreate,
     createHandler(ProfileInputSchema, (input: ProfileInput) =>
-      profileRepository.createProfile(input)
+      withOperationalLogWindow(getWindow, () => profileRepository.createProfile(input))
     )
   )
 
   ipcMain.handle(IPC_CHANNELS.profilesUpdate,
     createHandler(z.tuple([Id, ProfileInputSchema.partial()]), ([id, input]: [string, Partial<ProfileInput>]) =>
-      profileRepository.updateProfile(id, input)
+      withOperationalLogWindow(getWindow, () => profileRepository.updateProfile(id, input))
     )
   )
 
@@ -124,7 +125,9 @@ export function registerHostIpc(): void {
     createHandler(
       z.tuple([Id, OptionalId, z.string().optional()]),
       ([sourceId, targetHostId, name]: [string, string | undefined, string | undefined]) =>
-        profileRepository.duplicateProfile(sourceId, targetHostId, name)
+        withOperationalLogWindow(getWindow, () =>
+          profileRepository.duplicateProfile(sourceId, targetHostId, name)
+        )
     )
   )
 

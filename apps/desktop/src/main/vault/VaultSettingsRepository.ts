@@ -8,6 +8,7 @@ import {
 import { getDatabase } from '../db/database'
 import { vaultAuthManager } from './VaultAuthManager'
 import { vaultHealthCheck } from './vaultClient'
+import { checkVaultKvProbeWrite } from './VaultKvPreflight'
 import { vaultSecureStorage } from './VaultSecureStorage'
 
 const VAULT_SETTINGS_KEY = 'vault_settings'
@@ -218,7 +219,16 @@ export class VaultSettingsRepository {
   }
 
   async testConnection(): Promise<VaultStatus> {
-    return this.getStatus()
+    const status = await this.getStatus()
+    if (!status.authenticated) return status
+
+    const settings = this.getSettings()
+    const probe = await checkVaultKvProbeWrite(settings)
+    return {
+      ...status,
+      canWriteKv: probe.canWriteKv,
+      error: probe.error ?? status.error
+    }
   }
 }
 

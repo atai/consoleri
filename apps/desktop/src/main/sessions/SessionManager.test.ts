@@ -8,6 +8,16 @@ vi.mock('electron', () => ({
   app: { getPath: () => '/tmp/test' }
 }))
 
+vi.mock('../logging/OperationLog', () => ({
+  beginOperationLog: () => ({
+    logId: 'test-log',
+    log: vi.fn(),
+    fail: (message: string) => {
+      throw new Error(message)
+    }
+  })
+}))
+
 // ── Dependency stubs ──────────────────────────────────────────────────────────
 const {
   mockCreateTransport,

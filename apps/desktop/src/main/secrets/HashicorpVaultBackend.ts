@@ -4,6 +4,20 @@ import { vaultAuthManager } from '../vault/VaultAuthManager'
 import { vaultSettingsRepository } from '../vault/VaultSettingsRepository'
 import { vaultRequest } from '../vault/vaultClient'
 
+function isNotFoundVaultError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.toLowerCase().includes('not found') || message.includes('404')
+}
+
+function isPermissionVaultError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.toLowerCase().includes('permission denied') ||
+    message.includes('403') ||
+    message.toLowerCase().includes('forbidden')
+  )
+}
+
 export class HashicorpVaultBackend implements SecretBackend {
   readonly id = 'vault' as const
 
@@ -35,7 +49,9 @@ export class HashicorpVaultBackend implements SecretBackend {
           ])
         )
       }
-    } catch {
+    } catch (error) {
+      if (isPermissionVaultError(error)) throw error
+      if (!isNotFoundVaultError(error)) throw error
       /* new secret path */
     }
 

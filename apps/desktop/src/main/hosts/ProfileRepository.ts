@@ -13,7 +13,13 @@ import type {
   ProfileInput
 } from '../../shared/types'
 import { getDatabase } from '../db/database'
+import { beginOperationLog } from '../logging/OperationLog'
 import { secretBackendService } from '../secrets/SecretBackendService'
+import {
+  checkVaultKvWritePreflight,
+  formatKvPreflightDenial,
+  vaultDataPathFromRef
+} from '../vault/VaultKvPreflight'
 import { vaultSettingsRepository } from '../vault/VaultSettingsRepository'
 import type { HostProfileLinkExport } from '@consoleri/core'
 
@@ -51,14 +57,9 @@ export class ProfileRepository {
     if (isVaultRef(sourceCredentialRef)) {
       const material =
         authTypeFromCredentialRef(sourceCredentialRef) === 'privateKey' ? 'privateKey' : 'password'
-      const credentialRef = makeProfileCredentialRef(
-        'vault',
-        newProfileId,
-        material,
-        this.vaultOptions()
-      )
-      await secretBackendService.store(credentialRef, secret)
-      return credentialRef
+      return this.storeProfileSecret('vault', newProfileId, material, secret, {
+        fallbackLabel: 'Profile copy'
+      })
     }
 
     if (!sourceCredentialRef.startsWith('profile:')) return sourceCredentialRef
@@ -73,13 +74,48 @@ export class ProfileRepository {
     backend: 'local' | 'vault',
     profileId: string,
     material: 'password' | 'privateKey',
-    secret: string
+    secret: string,
+    logContext?: { hostId?: string; fallbackLabel?: string }
   ): Promise<string> {
     const credentialRef =
       backend === 'vault'
         ? makeProfileCredentialRef('vault', profileId, material, this.vaultOptions())
         : makeProfileCredentialRef('local', profileId, material)
-    await secretBackendService.store(credentialRef, secret)
+
+    if (backend !== 'vault') {
+      await secretBackendService.store(credentialRef, secret)
+      return credentialRef
+    }
+
+    const op = beginOperationLog({
+      kind: 'vault',
+      profileId,
+      hostId: logContext?.hostId,
+      fallbackLabel: logContext?.fallbackLabel ?? 'Profile save'
+    })
+    const dataPath = vaultDataPathFromRef(credentialRef)
+    op.log('info', `Storing ${material} to Vault path ${dataPath}`)
+
+    const settings = vaultSettingsRepository.getSettings()
+    const preflight = await checkVaultKvWritePreflight(settings, profileId)
+    op.log(
+      'debug',
+      `Preflight ${preflight.dataPath}: [${preflight.dataCapabilities.join(', ') || 'none'}]`
+    )
+    if (!preflight.skipped && !preflight.allowed) {
+      op.fail(formatKvPreflightDenial(preflight))
+    }
+    if (preflight.warning) {
+      op.log('warn', preflight.warning)
+    }
+
+    try {
+      await secretBackendService.store(credentialRef, secret)
+      op.log('info', 'Vault secret stored successfully')
+    } catch (error) {
+      op.fail('Vault store failed', error)
+    }
+
     return credentialRef
   }
 
@@ -173,9 +209,15 @@ export class ProfileRepository {
     const backend = this.resolveSecretBackend(input)
 
     if (input.password) {
-      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password)
+      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password, {
+        hostId: input.linkHostId,
+        fallbackLabel: 'Profile save'
+      })
     } else if (input.privateKey) {
-      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey)
+      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey, {
+        hostId: input.linkHostId,
+        fallbackLabel: 'Profile save'
+      })
     } else if (input.cloneFromProfileId) {
       const source = this.getProfile(input.cloneFromProfileId)
       if (source) {
@@ -215,10 +257,16 @@ export class ProfileRepository {
     const backend = this.resolveSecretBackend(input)
     if (input.password) {
       await this.deleteCredentialRef(existing.credentialRef)
-      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password)
+      credentialRef = await this.storeProfileSecret(backend, id, 'password', input.password, {
+        hostId: existing.jumpHostId ?? undefined,
+        fallbackLabel: 'Profile update'
+      })
     } else if (input.privateKey) {
       await this.deleteCredentialRef(existing.credentialRef)
-      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey)
+      credentialRef = await this.storeProfileSecret(backend, id, 'privateKey', input.privateKey, {
+        hostId: existing.jumpHostId ?? undefined,
+        fallbackLabel: 'Profile update'
+      })
     }
 
     getDatabase()

@@ -146,6 +146,15 @@ export function useProfileFormState(options: UseProfileFormStateOptions): Profil
   const supportsAuth = protocol === 'ssh' || protocol === 'rdp' || protocol === 'vnc'
   const jumpHostOptions = hosts.filter((h) => h.id !== linkHostId)
 
+  const setSubmitError = (err: unknown): void => {
+    const message = err instanceof Error ? err.message : String(err)
+    const vaultHint =
+      secretBackend === 'vault' ? ' Details are in the Vault log window.' : ''
+    setFormErrors({
+      submit: `Could not save profile: ${message}${vaultHint}`
+    })
+  }
+
   const handlePickKeyFile = async (): Promise<void> => {
     const path = await window.consoleri.keys.pickFile()
     if (path) setSelectedKeyPath(path)
@@ -192,6 +201,8 @@ export function useProfileFormState(options: UseProfileFormStateOptions): Profil
         }
         onSave()
         setShowPickDialog(false)
+      } catch (err) {
+        setSubmitError(err)
       } finally {
         setSaving(false)
       }
@@ -287,6 +298,8 @@ export function useProfileFormState(options: UseProfileFormStateOptions): Profil
       }
 
       onSave()
+    } catch (err) {
+      setSubmitError(err)
     } finally {
       setSaving(false)
     }

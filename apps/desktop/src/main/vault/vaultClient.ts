@@ -1,5 +1,8 @@
 import http from 'node:http'
 import https from 'node:https'
+import type { ClientRequest, IncomingMessage } from 'node:http'
+
+export const DEFAULT_VAULT_REQUEST_TIMEOUT_MS = 15_000
 
 export interface VaultRequestOptions {
   address: string
@@ -9,6 +12,7 @@ export interface VaultRequestOptions {
   namespace?: string
   body?: unknown
   tlsSkipVerify?: boolean
+  timeoutMs?: number
 }
 
 export interface VaultResponseBody {
@@ -28,12 +32,53 @@ function normalizeAddress(address: string): URL {
   return new URL(withScheme)
 }
 
+function attachRequestTimeout(
+  req: ClientRequest,
+  timeoutMs: number,
+  reject: (error: Error) => void
+): void {
+  req.setTimeout(timeoutMs, () => {
+    req.destroy()
+    reject(
+      new Error(`Vault request timed out (${Math.round(timeoutMs / 1000)}s). Check address and network.`)
+    )
+  })
+}
+
+function readResponse<T>(
+  res: IncomingMessage,
+  resolve: (value: T) => void,
+  reject: (error: Error) => void
+): void {
+  const chunks: Buffer[] = []
+  res.on('data', (chunk: Buffer) => chunks.push(chunk))
+  res.on('end', () => {
+    const text = Buffer.concat(chunks).toString('utf8')
+    let parsed: T
+    try {
+      parsed = text ? (JSON.parse(text) as T) : ({} as T)
+    } catch {
+      reject(new Error(`Invalid Vault response (${res.statusCode ?? 'unknown'})`))
+      return
+    }
+
+    if (res.statusCode && res.statusCode >= 400) {
+      const body = parsed as VaultResponseBody
+      const message = body.errors?.join('; ') || text || `HTTP ${res.statusCode}`
+      reject(new Error(message))
+      return
+    }
+    resolve(parsed)
+  })
+}
+
 export async function vaultRequest<T extends VaultResponseBody>(
   options: VaultRequestOptions
 ): Promise<T> {
   const url = normalizeAddress(options.address)
   const requestPath = `/v1/${options.path.replace(/^\/+/, '')}`
   const payload = options.body === undefined ? undefined : JSON.stringify(options.body)
+  const timeoutMs = options.timeoutMs ?? DEFAULT_VAULT_REQUEST_TIMEOUT_MS
 
   return new Promise<T>((resolve, reject) => {
     const isHttps = url.protocol === 'https:'
@@ -58,29 +103,10 @@ export async function vaultRequest<T extends VaultResponseBody>(
         headers,
         rejectUnauthorized: isHttps ? !options.tlsSkipVerify : undefined
       },
-      (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (chunk: Buffer) => chunks.push(chunk))
-        res.on('end', () => {
-          const text = Buffer.concat(chunks).toString('utf8')
-          let parsed: T
-          try {
-            parsed = text ? (JSON.parse(text) as T) : ({} as T)
-          } catch {
-            reject(new Error(`Invalid Vault response (${res.statusCode ?? 'unknown'})`))
-            return
-          }
-
-          if (res.statusCode && res.statusCode >= 400) {
-            const message = parsed.errors?.join('; ') || text || `HTTP ${res.statusCode}`
-            reject(new Error(message))
-            return
-          }
-          resolve(parsed)
-        })
-      }
+      (res) => readResponse<T>(res, resolve, reject)
     )
 
+    attachRequestTimeout(req, timeoutMs, reject)
     req.on('error', reject)
     if (payload !== undefined) req.write(payload)
     req.end()
@@ -91,10 +117,12 @@ export async function vaultHealthCheck(options: {
   address: string
   namespace?: string
   tlsSkipVerify?: boolean
+  timeoutMs?: number
 }): Promise<{ initialized: boolean; sealed: boolean }> {
   const url = normalizeAddress(options.address)
   const isHttps = url.protocol === 'https:'
   const transport = isHttps ? https : http
+  const timeoutMs = options.timeoutMs ?? DEFAULT_VAULT_REQUEST_TIMEOUT_MS
 
   return new Promise((resolve, reject) => {
     const req = transport.request(
@@ -129,6 +157,7 @@ export async function vaultHealthCheck(options: {
         })
       }
     )
+    attachRequestTimeout(req, timeoutMs, reject)
     req.on('error', reject)
     req.end()
   })

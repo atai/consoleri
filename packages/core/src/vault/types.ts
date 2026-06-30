@@ -40,6 +40,7 @@ export interface VaultStatus {
   authenticated: boolean
   sealed: boolean
   authMethod: VaultAuthMethod | null
+  canWriteKv?: boolean
   error?: string
 }
 

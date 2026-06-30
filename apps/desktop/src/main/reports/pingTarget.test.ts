@@ -1,4 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../logging/OperationLog', () => ({
+  beginOperationLog: () => ({
+    logId: 'test-log',
+    log: vi.fn(),
+    fail: (message: string) => {
+      throw new Error(message)
+    }
+  })
+}))
+
 import { buildLocalPingArgs, buildRemotePingCommand } from './pingTarget'
 
 describe('buildLocalPingArgs', () => {

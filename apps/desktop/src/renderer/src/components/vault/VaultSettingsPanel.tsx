@@ -71,6 +71,14 @@ export function VaultSettingsPanel(): React.JSX.Element {
       await handleSave()
       const result = await window.consoleri.vault.testConnection()
       setStatus(result)
+      if (result.authenticated && result.canWriteKv === false) {
+        setMessage(result.error ?? 'Vault authenticated but KV write access is denied')
+        return
+      }
+      if (result.authenticated && result.canWriteKv) {
+        setMessage('Vault connection successful (KV write access OK)')
+        return
+      }
       setMessage(
         result.authenticated
           ? 'Vault connection successful'
@@ -129,6 +137,8 @@ export function VaultSettingsPanel(): React.JSX.Element {
                   {status.authenticated ? 'Authenticated' : 'Not authenticated'}
                   {status.sealed ? ' · Sealed' : ''}
                   {status.authMethod ? ` · ${status.authMethod}` : ''}
+                  {status.canWriteKv === true ? ' · KV write OK' : ''}
+                  {status.canWriteKv === false ? ' · KV write denied' : ''}
                   {status.error ? ` · ${status.error}` : ''}
                 </>
               ) : (
