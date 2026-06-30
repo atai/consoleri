@@ -26,6 +26,6 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "pnpm": "10.12.1"
+    "pnpm": "10.34.4"
   }
 }
